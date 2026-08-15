@@ -1,97 +1,181 @@
-# CP-Agent ⚡
+# Upsolver
 
-**Agentic Competitive Programming Intelligence Platform**
+Autonomous Competitive Programming Intelligence Platform and Tactical Browser Companion.
 
-An autonomous multi-agent system built with **LangGraph** that analyzes your Codeforces and LeetCode profiles, generates detailed performance reports, builds personalized study plans, and finds practice problems — all powered by **Gemini 2.0 Flash** (free tier).
+Most competitive programmers approach improvement with a remarkably consistent strategy: solve three random problems, get hit with Wrong Answer on test 2, stare blankly at an editorial, and vow to start a 12-week dynamic programming grind on Monday. Monday never comes.
+
+Upsolver exists because staring at your rating graph while listening to ambient synth music is not an actionable training regimen. It is an agentic analysis engine powered by LangGraph, FastAPI, and modern LLMs that ingests your real contest submissions across Codeforces and LeetCode, diagnoses your actual algorithmic bottlenecks, and synthesizes deliberate practice routines that you might actually follow.
+
+And because opening a separate browser tab is apparently too high of a cognitive barrier when you are tilting after a -75 rating drop, we built both a dedicated industrial web console and a fully featured Chrome Extension.
+
+---
+
+## The Dual-Form Factor
+
+You get the exact same intelligence suite in two distinct formats:
+
+### 1. The Industrial Web Console (React + Vite + Tailwind)
+A tactile, Dieter Rams and Teenage Engineering-inspired command center. It features dual 45-degree neumorphic shadow fields, recessed input wells, mechanical button press physics, glowing LED status diodes, and zero minimalist whitespace fluff. It looks and feels like a piece of high-precision laboratory hardware calibrated specifically to inform you that your graph traversal accuracy is embarrassing.
+
+### 2. The Chrome Extension (Manifest V3 Popup)
+We packaged the entire dashboard into an 800x600 browser popup. Whether you are actively competing on Codeforces, grinding daily LeetCode challenges, or lurking on a rival's profile, the extension provides instantaneous access to:
+- Live telemetry and structured evaluation briefings without tab-switching.
+- Multi-platform contest rating progression graphs with interactive Codeforces vs LeetCode toggles.
+- Friends Roster & Live Rating Tracker: Keep tabs on your peers' ratings across both platforms without manual lookups.
+- One-Click Head-to-Head Peer Duels: Click a button next to any friend's name to instantly simulate an algorithmic differential analysis and see whose dynamic programming skills are actually carrying the team.
+
+---
+
+## Core Capabilities
+
+### Algorithmic Autopsy (Component Report)
+No raw markdown dumps or generic advice. Upsolver breaks down your profile into dedicated component telemetry:
+- Executive Snapshot: High-level overview of contest velocity, rating tiers, and submission cadence.
+- Bottleneck Identification: Direct measurement of Wrong Answer (WA%) vs Time Limit Exceeded (TLE%) failure rates and high-fatigue submission windows.
+- Tactical Directives: Specific algorithmic weaknesses prioritized by error rate and attempt volume, paired with your calibrated peak solving hours.
+- Dual-Platform Rating Curves: Interactive visual trajectories for both Codeforces ELO and LeetCode contest rating history.
+
+### Dynamic Curriculum Synthesis (with Human-in-the-Loop)
+Tell the AI your weekly availability and target rating goals. It generates a multi-week, structured curriculum targeting your exact weak topics with verified platform problems.
+- Don't like the proposed focus on Segment Trees? Hit the Revise button, type your natural language adjustments, and the planner node recalibrates the syllabus while preserving your verified progress.
+- Save and export customized plans locally or to PDF.
+
+### Precision Problem Matrix
+A tactical problem finder equipped with a physical 3-position difficulty switch (Easy, Medium, Hard), platform filters, and live tag filtering. It serves targeted practice problems tailored to your current rating boundary rather than throwing 3000-rated monstrosities at you.
+
+### Head-to-Head Benchmark Duels
+Compare your profile against any competitor or benchmark handle (like tourist, if you enjoy emotional damage). Upsolver calculates rating deltas, identifies shared weak spots where both of you struggle, and highlights algorithmic categories where you hold a statistical edge.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Agent framework | LangGraph + LangChain |
-| LLM | Gemini 2.0 Flash (free tier) |
-| CF data | Codeforces public API (no key) |
-| LC data | alfa-leetcode-api (Docker) + GraphQL fallback |
-| State persistence | LangGraph SqliteSaver |
-| Data analysis | Pandas + NumPy |
-| Frontend | React + Vite + Tailwind CSS |
-| Extension | Chrome Extension (Manifest V3) |
-| Backend API | FastAPI + Uvicorn |
-| PDF export | WeasyPrint |
+| Layer | Technology | Purpose |
+|---|---|---|
+| Multi-Agent Orchestration | LangGraph + LangChain Core | Cyclic graph execution, checkpointing, and state management |
+| Reasoning Models | Gemini 2.0 Flash / Groq (Qwen-32B) | Algorithmic telemetry reasoning and curriculum synthesis |
+| Backend API | FastAPI + Uvicorn | High-throughput asynchronous REST endpoints |
+| Web Frontend | React 19 + Vite + Tailwind CSS v4 | Industrial skeuomorphic tactile interface and Recharts telemetry |
+| Browser Extension | Chrome Extension (Manifest V3) | Standalone popup console with chrome.storage persistence |
+| Data Scraping | Asynchronous HTTPX + LeetCode GraphQL | Parallel multi-platform profile, contest, and submission ingestion |
 
 ---
 
-## Project Structure
+## Architecture Overview
 
 ```
 LC_CF/
 ├── agents/                     # LangGraph agents (scraper, analyzer, planner, finder, comparison)
-├── tools/                      # API tools (Codeforces, LeetCode, PDF, report)
-├── graph/                      # StateGraph wiring & checkpointer
-├── frontend-react/             # Upsolver React Web Console
-├── extension/                  # Upsolver Chrome Extension (MV3)
+├── tools/                      # Platform ingestion tools (Codeforces, LeetCode GraphQL, report formatters)
+├── graph/                      # StateGraph wiring and checkpoint persistence
+├── frontend-react/             # React web console (Vite + Tailwind CSS v4)
+│   ├── src/components/         # Modular industrial components (Report, Plan, Problems, Compare)
+│   └── src/index.css           # Industrial skeuomorphic design system & tactile tokens
+├── extension/                  # Manifest V3 Chrome Extension
+│   ├── popup/                  # Standalone 800x600 console (HTML, CSS, JS)
+│   └── manifest.json           # MV3 extension configuration
 ├── server.py                   # FastAPI backend server
-├── start.sh                    # One-command fullstack launcher
-└── requirements.txt
+├── start.sh                    # Unified launcher for backend and frontend
+└── requirements.txt            # Python dependencies
 ```
 
 ---
 
-## Setup
+## Installation and Quickstart
 
-### 1. Install dependencies
+### Prerequisites
+- Python 3.10+
+- Node.js 18+ and npm
+- A free API key from Google AI Studio or Groq
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/aansh-1080p/Upsolver.git
+cd Upsolver
+```
+
+### 2. Backend Setup
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cd frontend-react && npm install && cd ..
 ```
 
-### 2. Launch Upsolver
+### 3. Environment Configuration
+
+Copy the example configuration and add your preferred API key:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and configure at least one LLM key:
+
+```ini
+# Option A (Recommended): Free key from https://console.groq.com
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=qwen/qwen3-32b
+
+# Option B: Free key from https://aistudio.google.com
+GOOGLE_API_KEY=your_google_api_key_here
+```
+
+### 4. Web Console Setup
+
+```bash
+cd frontend-react
+npm install
+cd ..
+```
+
+### 5. Launch Everything
+
+Run the root start script to spin up both the FastAPI backend and the React web console:
 
 ```bash
 ./start.sh
 ```
+
 - Web App: `http://localhost:5173`
-- Backend API: `http://localhost:8000`
-
-
----
-
-## LangGraph Features Used
-
-| Feature | Where |
-|---|---|
-| `StateGraph` + `TypedDict` state | `graph/state.py`, `graph/graph_builder.py` |
-| Node functions | `agents/scraper_agent.py` |
-| Conditional edges | `graph/graph_builder.py` (stub, Week 3) |
-| `SqliteSaver` checkpointing | `graph/checkpointer.py` |
-| `asyncio.gather` parallel tools | `agents/scraper_agent.py` |
-| `add_messages` reducer | `graph/state.py` |
-| Human-in-the-loop (`interrupt`) | Week 3 — planner agent |
-| `.astream_events()` streaming | Week 2 — report generator |
+- Backend API Docs: `http://localhost:8000/docs`
 
 ---
 
-## Weekly Build Plan
+## Installing the Chrome Extension
 
-| Week | Focus | Status |
-|---|---|---|
-| 1 | Project setup, scraper agent, state schema | ✅ Complete |
-| 2 | Analyzer agent + report generator + streaming | 🔲 Upcoming |
-| 3 | Supervisor agent + planner with HITL | 🔲 Upcoming |
-| 4 | Problem finder + full Streamlit UI + PDF export | 🔲 Upcoming |
+1. Ensure the FastAPI backend is running (`./start.sh` or `python server.py`).
+2. Open Google Chrome and navigate to `chrome://extensions`.
+3. Enable **Developer mode** in the top right corner.
+4. Click **Load unpacked** in the top left.
+5. Select the `extension/` folder inside the `Upsolver` directory.
+6. Pin Upsolver to your browser toolbar and click the icon to open the console anytime you are solving problems.
 
 ---
 
-## Resume Bullet Points
+## CLI Usage
 
-- Built a **multi-agent LangGraph system** with a supervisor orchestrating 4 specialized sub-agents for data scraping, analysis, planning, and problem discovery
-- Implemented **Human-in-the-Loop** nodes using LangGraph's `interrupt()` for interactive study plan refinement
-- Used **LangGraph SqliteSaver** checkpointing to cache scraped profiles across sessions, eliminating redundant API calls
-- Designed **conditional routing logic** to handle 3 distinct user workflows (report / plan / problems) within a single compiled graph
-- Streamed LLM-generated report sections token-by-token using **LangGraph's `.astream_events()` API**
-- Fetched data concurrently from Codeforces API and LeetCode using **`asyncio.gather()`** inside LangGraph tool nodes
+If you prefer operating strictly from the terminal:
+
+```bash
+source venv/bin/activate
+
+# Generate a diagnostic performance report
+python main.py --cf tourist --lc neal_wu --intent report
+
+# Generate a study plan
+python main.py --cf tourist --intent plan --weeks 4 --hours 10
+
+# Find targeted practice problems
+python main.py --cf tourist --intent problems --difficulty medium
+
+# Run a head-to-head comparison
+python main.py --cf tourist --peer-cf Benq --intent compare
+```
+
+---
+
+## License
+
+MIT License. Built for competitive programmers who are tired of guessing why their code passed 44 out of 45 test cases.
