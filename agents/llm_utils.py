@@ -63,7 +63,7 @@ def get_llm(temperature: float = 0.3):
 
     if groq_key:
         from langchain_groq import ChatGroq
-        model = os.getenv("GROQ_MODEL", "qwen/qwen3-32b").strip()
+        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
         print(f"[LLM] Using Groq → {model}")
         return ChatGroq(model=model, temperature=temperature, api_key=groq_key)
 

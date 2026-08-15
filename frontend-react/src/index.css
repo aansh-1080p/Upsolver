@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background-color: #e0e5ec;
+    color: #2d3436;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+  }
+  .font-mono, code, pre, kbd {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* ── INDUSTRIAL SKEUOMORPHIC TOKENS ── */
+:root {
+  --bg-chassis: #e0e5ec;
+  --bg-panel: #f0f2f5;
+  --bg-recessed: #d1d9e6;
+  --text-primary: #2d3436;
+  --text-muted: #4a5568;
+  --accent-orange: #ff4757;
+  --accent-orange-hover: #ff6b81;
+  --shadow-dark: #babecc;
+  --shadow-light: #ffffff;
+}
+
+/* ── NEUMORPHIC DUAL-SHADOW SYSTEM (45° TOP-LEFT LIGHTING) ── */
+.industrial-card {
+  background-color: #e0e5ec;
+  border-radius: 16px;
+  box-shadow: 8px 8px 16px #babecc, -8px -8px 16px #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  position: relative;
+  transition: all 250ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.industrial-card:hover {
+  box-shadow: 10px 10px 20px #babecc, -10px -10px 20px #ffffff;
+}
+
+.industrial-panel {
+  background-color: #f0f2f5;
+  border-radius: 12px;
+  box-shadow: 6px 6px 12px #babecc, -6px -6px 12px #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.industrial-recessed {
+  background-color: #d1d9e6;
+  border-radius: 10px;
+  box-shadow: inset 4px 4px 8px #babecc, inset -4px -4px 8px #ffffff;
+  border: none;
+}
+
+.industrial-recessed-subtle {
+  background-color: #e0e5ec;
+  border-radius: 8px;
+  box-shadow: inset 2px 2px 5px #babecc, inset -2px -2px 5px #ffffff;
+}
+
+.industrial-dark-card {
+  background-color: #2d3436;
+  color: #f0f2f5;
+  border-radius: 16px;
+  box-shadow: 8px 8px 18px #babecc, -8px -8px 18px #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── PHYSICAL BUTTONS (TACTILE KEYS) ── */
+.btn-industrial-primary {
+  background: linear-gradient(135deg, #ff5252 0%, #ff4757 100%);
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 0.6rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 5px 5px 10px #babecc, -5px -5px 10px #ffffff, inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 150ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.8rem;
+}
+
+.btn-industrial-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff6b81 0%, #ff5252 100%);
+  box-shadow: 6px 6px 14px #babecc, -6px -6px 14px #ffffff, 0 0 12px rgba(255, 71, 87, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-industrial-primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 4px 4px 8px rgba(166, 30, 45, 0.6), inset -4px -4px 8px rgba(255, 120, 130, 0.4);
+}
+
+.btn-industrial-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-industrial-secondary {
+  background-color: #e0e5ec;
+  color: #2d3436;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 4px 4px 9px #babecc, -4px -4px 9px #ffffff;
+  transition: all 150ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.btn-industrial-secondary:hover:not(:disabled) {
+  color: #ff4757;
+  box-shadow: 6px 6px 12px #babecc, -6px -6px 12px #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-industrial-secondary:active:not(:disabled),
+.btn-industrial-secondary.active {
+  transform: translateY(1px);
+  background-color: #d8e0ea;
+  color: #ff4757;
+  box-shadow: inset 3px 3px 6px #babecc, inset -3px -3px 6px #ffffff;
+}
+
+/* ── RECESSED DATA INPUT WELLS ── */
+.input-industrial {
+  background-color: #d8e0ea;
+  color: #2d3436;
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  border: none;
+  box-shadow: inset 3px 3px 7px #babecc, inset -3px -3px 7px #ffffff;
+  outline: none;
+  transition: all 200ms ease;
+}
+
+.input-industrial:focus {
+  box-shadow: inset 3px 3px 7px #babecc, inset -3px -3px 7px #ffffff, 0 0 0 2px rgba(255, 71, 87, 0.4);
+}
+
+.input-industrial::placeholder {
+  color: #8c9ba5;
+}
+
+/* ── MANUFACTURING DETAILS (SCREWS & VENTS) ── */
+.corner-screws {
+  position: relative;
+}
+
+.corner-screws::before {
+  content: " ";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff 10%, #a3b1c6 60%, #718096 100%);
+  box-shadow: inset 1px 1px 1px rgba(0,0,0,0.4), 0.5px 0.5px 1px rgba(255,255,255,0.8);
+  pointer-events: none;
+}
+
+.corner-screws::after {
+  content: " ";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff 10%, #a3b1c6 60%, #718096 100%);
+  box-shadow: inset 1px 1px 1px rgba(0,0,0,0.4), 0.5px 0.5px 1px rgba(255,255,255,0.8);
+  pointer-events: none;
+}
+
+.vent-slot {
+  height: 16px;
+  width: 3px;
+  border-radius: 99px;
+  background: #cbd5e1;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.3), 0.5px 0.5px 1px #ffffff;
+}
+
+/* ── LED STATUS DIODES ── */
+.led-indicator-green {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #2ed573;
+  box-shadow: 0 0 8px 2px rgba(46, 213, 115, 0.7), inset -1px -1px 2px rgba(0,0,0,0.2);
+}
+
+.led-indicator-orange {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff4757;
+  box-shadow: 0 0 8px 2px rgba(255, 71, 87, 0.7), inset -1px -1px 2px rgba(0,0,0,0.2);
+}
+
+/* ── EMBOSSED TEXT HIGHLIGHT ── */
+.text-embossed {
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+/* ── WORKSHOP RETRO SCROLLBAR ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #d8e0ea;
+  box-shadow: inset 1px 1px 3px #babecc;
+}
+::-webkit-scrollbar-thumb {
+  background: #a3b1c6;
+  border-radius: 4px;
+  border: 1px solid #e0e5ec;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #718096;
+}
+
+

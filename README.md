@@ -16,7 +16,9 @@ An autonomous multi-agent system built with **LangGraph** that analyzes your Cod
 | LC data | alfa-leetcode-api (Docker) + GraphQL fallback |
 | State persistence | LangGraph SqliteSaver |
 | Data analysis | Pandas + NumPy |
-| Frontend | Streamlit |
+| Frontend | React + Vite + Tailwind CSS |
+| Extension | Chrome Extension (Manifest V3) |
+| Backend API | FastAPI + Uvicorn |
 | PDF export | WeasyPrint |
 
 ---
@@ -24,82 +26,38 @@ An autonomous multi-agent system built with **LangGraph** that analyzes your Cod
 ## Project Structure
 
 ```
-cp-agent/
-├── agents/
-│   ├── __init__.py
-│   └── scraper_agent.py        # Week 1: parallel CF + LC fetch
-├── tools/
-│   ├── __init__.py
-│   ├── codeforces_tools.py     # CF API async functions
-│   └── leetcode_tools.py       # LC API with auto-fallback to GraphQL
-├── graph/
-│   ├── __init__.py
-│   ├── state.py                # AgentState TypedDict (shared state)
-│   ├── checkpointer.py         # SqliteSaver setup
-│   └── graph_builder.py        # StateGraph wiring
-├── frontend/
-│   └── app.py                  # Streamlit UI
-├── output/
-│   └── reports/                # Generated PDFs
-├── tests/
-│   └── test_scraper.py         # Week 1 test suite
-├── main.py                     # CLI entry point
-├── requirements.txt
-└── .env.example
+LC_CF/
+├── agents/                     # LangGraph agents (scraper, analyzer, planner, finder, comparison)
+├── tools/                      # API tools (Codeforces, LeetCode, PDF, report)
+├── graph/                      # StateGraph wiring & checkpointer
+├── frontend-react/             # Upsolver React Web Console
+├── extension/                  # Upsolver Chrome Extension (MV3)
+├── server.py                   # FastAPI backend server
+├── start.sh                    # One-command fullstack launcher
+└── requirements.txt
 ```
 
 ---
 
 ## Setup
 
-### 1. Clone & install dependencies
+### 1. Install dependencies
 
 ```bash
-git clone https://github.com/yourname/cp-agent.git
-cd cp-agent
-python -m venv venv
-source venv/bin/activate       # Windows: venv\Scripts\activate
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
+cd frontend-react && npm install && cd ..
 ```
 
-### 2. Configure environment
+### 2. Launch Upsolver
 
 ```bash
-cp .env.example .env
-# Edit .env and add your Gemini API key:
-# GOOGLE_API_KEY=your_key_here
-# Get it free at: https://aistudio.google.com
+./start.sh
 ```
+- Web App: `http://localhost:5173`
+- Backend API: `http://localhost:8000`
 
-### 3. Start the LeetCode API (Docker)
-
-```bash
-docker run -p 3000:3000 alfaarghya/alfa-leetcode-api:2.0.3
-```
-
-> If Docker isn't available, the code automatically falls back to LeetCode's GraphQL API.
-
----
-
-## Usage
-
-### Run tests (Week 1)
-
-```bash
-python tests/test_scraper.py --cf <your_cf_handle> --lc <your_lc_username>
-```
-
-### CLI
-
-```bash
-python main.py --cf tourist --lc neal_wu --intent report
-```
-
-### Streamlit UI
-
-```bash
-streamlit run frontend/app.py
-```
 
 ---
 

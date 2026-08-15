@@ -1,6 +1,11 @@
 __pycache__/
 venv/
 .env
+.env.local
 output/
 .DS_Store
 *.pyc
+*.sqlite
+*.sqlite3
+node_modules/
+dist/

@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Upsolver",
+  "version": "1.0.0",
+  "description": "Competitive Programming Intelligence — Analyze Codeforces & LeetCode profiles, generate study plans, discover practice problems, and compare with peers.",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Upsolver"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  }
+}

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upsolver</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="app-header">
+    <div class="header-left">
+      <div class="logo-mark">⚡</div>
+      <div class="header-text">
+        <span class="header-title">Upsolver</span>
+        <span class="header-sub">Competitive Programming Intelligence</span>
+      </div>
+    </div>
+    <div id="backend-status" class="status-badge status-offline">
+      <span class="status-dot"></span>
+      <span id="status-label">Connecting…</span>
+    </div>
+  </header>
+
+  <!-- Handle Bar -->
+  <section id="handle-bar">
+    <div class="handle-inputs">
+      <div class="input-group">
+        <label for="cf-handle">Codeforces</label>
+        <input type="text" id="cf-handle" placeholder="e.g. tourist" value="Moderator" spellcheck="false">
+      </div>
+      <div class="input-group">
+        <label for="lc-handle">LeetCode</label>
+        <input type="text" id="lc-handle" placeholder="e.g. neal_wu" value="doomscrollerfinalboss" spellcheck="false">
+      </div>
+    </div>
+    <button id="run-btn" class="btn-primary">
+      <span id="run-btn-text">Generate Report</span>
+      <span id="run-btn-spinner" class="spinner" hidden></span>
+    </button>
+  </section>
+
+  <!-- Tab Navigation -->
+  <nav id="tab-nav">
+    <button class="tab-btn active" data-tab="report">Report</button>
+    <button class="tab-btn" data-tab="plan">Study Plan</button>
+    <button class="tab-btn" data-tab="problems">Problems</button>
+    <button class="tab-btn" data-tab="compare">Compare</button>
+    <button class="tab-btn" data-tab="friends">Friends <span id="friends-count-badge" class="count-badge">0</span></button>
+  </nav>
+
+
+  <!-- Tab Content Panels -->
+  <main id="tab-content">
+
+    <!-- ═══════ REPORT TAB ═══════ -->
+    <section id="tab-report" class="tab-panel active">
+      <div id="report-empty" class="empty-state">
+        <div class="empty-icon">📊</div>
+        <h3>No Report Yet</h3>
+        <p>Enter your handles above and click <strong>Generate Report</strong>.</p>
+      </div>
+      <div id="report-loading" class="loading-state" hidden>
+        <div class="spinner-lg"></div>
+        <p>Scraping profiles &amp; analyzing performance…</p>
+      </div>
+      <div id="report-content" hidden>
+        <!-- Errors -->
+        <div id="report-errors" class="alert alert-warn" hidden></div>
+        <!-- Title -->
+        <div class="section-header">
+          <h2>Performance Overview</h2>
+          <p id="report-subtitle" class="subtitle"></p>
+        </div>
+        <!-- Metric Cards -->
+        <div id="metric-cards" class="metric-grid"></div>
+        <!-- Chart + Weak Topics Row -->
+        <div class="split-row">
+          <div class="card chart-card">
+            <div class="card-header">
+              <h3>Rating Progression</h3>
+              <div class="segmented-control" id="report-chart-control">
+                <button class="seg-btn active" id="btn-chart-cf" type="button">CF</button>
+                <button class="seg-btn" id="btn-chart-lc" type="button">LC</button>
+              </div>
+            </div>
+            <canvas id="rating-chart" width="480" height="200"></canvas>
+            <div id="chart-empty" class="chart-empty-msg" hidden>No rated contest history found.</div>
+          </div>
+
+          <div class="card weak-card">
+            <div class="card-header">
+              <h3>Weak Areas</h3>
+            </div>
+            <div id="weak-topics-list" class="topic-list"></div>
+          </div>
+        </div>
+        <!-- Evaluation Briefing -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Performance Evaluation Briefing</h3>
+            <p class="subtitle">Structured coach analysis &amp; tactical directives</p>
+          </div>
+          <div id="report-narrative" class="evaluation-grid"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ═══════ PLAN TAB ═══════ -->
+    <section id="tab-plan" class="tab-panel">
+      <!-- Plan Config -->
+      <div class="card">
+        <div class="card-header"><h3>Plan Configuration</h3></div>
+        <div class="plan-config-grid">
+          <div class="input-group span-2">
+            <label for="plan-goal">Goal</label>
+            <input type="text" id="plan-goal" placeholder="e.g. Reach Expert on Codeforces" value="Improve competitive programming skills">
+          </div>
+          <div class="input-group">
+            <label for="plan-weeks">Duration</label>
+            <select id="plan-weeks">
+              <option value="2">2 Weeks</option>
+              <option value="4" selected>4 Weeks</option>
+              <option value="6">6 Weeks</option>
+              <option value="8">8 Weeks</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="plan-hours">Daily Hours</label>
+            <select id="plan-hours">
+              <option value="1">1 hr/day</option>
+              <option value="2" selected>2 hrs/day</option>
+              <option value="3">3 hrs/day</option>
+              <option value="4">4+ hrs/day</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button id="plan-generate-btn" class="btn-primary">Generate Plan</button>
+        </div>
+      </div>
+
+      <!-- Saved Plans -->
+      <div class="card" id="saved-plans-card">
+        <div class="card-header">
+          <h3>Saved Plans</h3>
+          <span id="saved-plans-count" class="count-badge">0</span>
+        </div>
+        <div id="saved-plans-list" class="saved-plans-list">
+          <p class="empty-msg">No saved plans yet.</p>
+        </div>
+      </div>
+
+      <!-- Plan Loading -->
+      <div id="plan-loading" class="loading-state" hidden>
+        <div class="spinner-lg"></div>
+        <p>Generating tailored study plan…</p>
+      </div>
+
+      <!-- Plan Status Banner -->
+      <div id="plan-status-banner" class="plan-banner" hidden>
+        <span id="plan-status-icon"></span>
+        <div id="plan-status-text"></div>
+        <span id="plan-status-badge" class="status-pill"></span>
+      </div>
+
+      <!-- Weekly Roadmap -->
+      <div id="plan-weeks-container" hidden>
+        <h3 class="section-title">Weekly Curriculum</h3>
+        <div id="plan-weeks-grid" class="weeks-grid"></div>
+      </div>
+
+      <!-- HITL Revision Bar -->
+      <div id="hitl-bar" class="card hitl-card" hidden>
+        <h4>Refine or Approve</h4>
+        <p class="subtitle">Tell the planner agent what to change, or approve the plan.</p>
+        <div class="hitl-actions">
+          <input type="text" id="hitl-feedback" placeholder="e.g. Replace Week 2 with Segment Trees">
+          <button id="hitl-revise-btn" class="btn-secondary">Revise</button>
+          <button id="hitl-approve-btn" class="btn-success">Approve</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ PROBLEMS TAB ═══════ -->
+    <section id="tab-problems" class="tab-panel">
+      <!-- Controls -->
+      <div class="card">
+        <div class="problems-controls">
+          <div class="difficulty-group">
+            <span class="control-label">Difficulty:</span>
+            <div class="segmented-control" id="difficulty-control">
+              <button class="seg-btn" data-val="easy">Easy</button>
+              <button class="seg-btn active" data-val="medium">Medium</button>
+              <button class="seg-btn" data-val="hard">Hard</button>
+            </div>
+          </div>
+          <button id="problems-search-btn" class="btn-primary">Find Problems</button>
+        </div>
+        <div id="weak-chips" class="chip-row" hidden></div>
+      </div>
+
+      <!-- Filters -->
+      <div id="problems-filters" class="filter-bar" hidden>
+        <div class="segmented-control" id="platform-control">
+          <button class="seg-btn active" data-val="all">All</button>
+          <button class="seg-btn" data-val="codeforces">CF</button>
+          <button class="seg-btn" data-val="cses">CSES</button>
+          <button class="seg-btn" data-val="leetcode">LC</button>
+        </div>
+        <input type="text" id="tag-search" placeholder="Filter by tag…" class="search-input">
+      </div>
+
+      <!-- Loading -->
+      <div id="problems-loading" class="loading-state" hidden>
+        <div class="spinner-lg"></div>
+        <p>Searching problem banks…</p>
+      </div>
+
+      <!-- Problem Grid -->
+      <div id="problems-grid" class="problems-grid"></div>
+
+      <!-- Empty State -->
+      <div id="problems-empty" class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>No Problems Loaded</h3>
+        <p>Click <strong>Find Problems</strong> to scan Codeforces, CSES, and LeetCode.</p>
+      </div>
+    </section>
+
+    <!-- ═══════ COMPARE TAB ═══════ -->
+    <section id="tab-compare" class="tab-panel">
+      <!-- Peer Inputs -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Head-to-Head Comparison</h3>
+          <button id="save-competitor-btn" class="btn-secondary text-xs" style="padding: 3px 8px;" type="button">
+            <span>+ Save Friend</span>
+          </button>
+        </div>
+        
+        <!-- Quick Duel Friends Bar -->
+        <div id="compare-friends-quickbar" class="friend-quick-duel-bar" hidden>
+          <span class="control-label">⚔️ Quick Duel Friend:</span>
+          <div id="compare-friends-chips" class="friend-chips-row"></div>
+        </div>
+
+        <div class="compare-inputs">
+          <div class="input-group">
+            <label for="peer-cf">Competitor CF Handle</label>
+            <input type="text" id="peer-cf" placeholder="e.g. tourist" value="Ravindra19">
+          </div>
+          <div class="input-group">
+            <label for="peer-lc">Competitor LC Username</label>
+            <input type="text" id="peer-lc" placeholder="e.g. neal_wu" value="Ravindra056">
+          </div>
+        </div>
+        <div class="card-actions">
+          <button id="compare-run-btn" class="btn-primary">Run Comparison</button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="compare-loading" class="loading-state" hidden>
+        <div class="spinner-lg"></div>
+        <p>Fetching competitor data…</p>
+      </div>
+
+      <!-- Compare Content -->
+      <div id="compare-content" hidden>
+        <!-- Side by Side Cards -->
+        <div class="compare-cards">
+          <div id="compare-you" class="card compare-card compare-you"></div>
+          <div id="compare-peer" class="card compare-card compare-peer"></div>
+        </div>
+
+        <!-- Dual Chart -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <h3>Rating Progression Overlay</h3>
+          </div>
+          <canvas id="compare-chart" width="720" height="220"></canvas>
+        </div>
+
+        <!-- Tag Breakdown -->
+        <div class="compare-tags-grid">
+          <div class="card">
+            <h4 class="tag-section-title warn-title">⚠ Both Struggle</h4>
+            <div id="common-weak-list" class="tag-list"></div>
+          </div>
+          <div class="card">
+            <h4 class="tag-section-title good-title">🔵 Your Edge</h4>
+            <div id="your-edge-list" class="tag-list"></div>
+          </div>
+          <div class="card">
+            <h4 class="tag-section-title bad-title">🔴 Peer's Edge</h4>
+            <div id="peer-edge-list" class="tag-list"></div>
+          </div>
+        </div>
+
+        <!-- AI Narrative -->
+        <div class="card" id="compare-narrative-card" hidden>
+          <div class="card-header"><h3>Strategic Breakdown</h3></div>
+          <div id="compare-narrative" class="narrative"></div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="compare-empty" class="empty-state">
+        <div class="empty-icon">⚔️</div>
+        <h3>No Comparison Data</h3>
+        <p>Enter competitor handles or choose a friend above and click <strong>Run Comparison</strong>.</p>
+      </div>
+    </section>
+
+    <!-- ═══════ FRIENDS TAB ═══════ -->
+    <section id="tab-friends" class="tab-panel">
+      <!-- Add Friend Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Add Friend to Roster</h3>
+          <p class="subtitle">Track ratings &amp; launch 1-click head-to-head peer duels</p>
+        </div>
+        <div class="friend-add-grid">
+          <div class="input-group">
+            <label for="friend-name">Friend / Rival Name</label>
+            <input type="text" id="friend-name" placeholder="e.g. Alex (Rival)">
+          </div>
+          <div class="input-group">
+            <label for="friend-cf">Codeforces Handle</label>
+            <input type="text" id="friend-cf" placeholder="e.g. tourist">
+          </div>
+          <div class="input-group">
+            <label for="friend-lc">LeetCode Username</label>
+            <input type="text" id="friend-lc" placeholder="e.g. neal_wu">
+          </div>
+        </div>
+        <div class="card-actions">
+          <button id="add-friend-btn" class="btn-primary">
+            <span>+ Add to Friends</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Friends List -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Tracked Friends Roster</h3>
+          <button id="refresh-all-friends-btn" class="btn-secondary text-xs" style="padding: 4px 10px;" type="button">
+            <span>🔄 Refresh Ratings</span>
+          </button>
+        </div>
+        <div id="friends-list" class="friends-roster-list">
+          <p class="empty-msg">No friends added yet. Add friends above to track their ratings and launch peer duels.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" hidden>
+    <span id="toast-msg"></span>
+  </div>
+
+  <!-- Footer -->
+  <footer id="app-footer">
+    Upsolver // Industrial CP Console · <code>localhost:8000</code>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+
