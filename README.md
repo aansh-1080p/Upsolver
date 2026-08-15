@@ -176,6 +176,4 @@ python main.py --cf tourist --peer-cf Benq --intent compare
 
 ---
 
-## License
-
-MIT License. Built for competitive programmers who are tired of guessing why their code passed 44 out of 45 test cases.
+##  Built for competitive programmers who are tired of guessing why their code passed 44 out of 45 test cases.
