@@ -61,10 +61,11 @@ export default function Navbar({ health, activeTab, setActiveTab }) {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-[#e0e5ec] shadow-[inset_2px_2px_4px_#babecc,inset_-2px_-2px_4px_#ffffff] border border-white/60">
             <span
-              className={isOnline ? 'led-indicator-green animate-pulse' : 'led-indicator-orange'}
+              className={isOnline ? 'led-indicator-green animate-pulse' : 'led-indicator-red'}
+              title={isOnline ? `Server Online (${health?.active_provider || 'Active'})` : 'Server Offline'}
             />
             <span className="text-[11px] font-bold font-mono text-[#2d3436] tracking-wider uppercase">
-              {isOnline ? `ONLINE // ${health?.active_provider || 'ACTIVE'}` : 'OFFLINE'}
+              Server
             </span>
           </div>
         </div>

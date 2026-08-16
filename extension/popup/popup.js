@@ -125,12 +125,14 @@ async function checkHealth() {
     const badge = $('#backend-status');
     const label = $('#status-label');
     badge.className = 'status-badge status-online';
-    label.textContent = data.active_provider || 'Online';
+    badge.title = `Server Online (${data.active_provider || 'Active'})`;
+    label.textContent = 'Server';
   } catch {
     const badge = $('#backend-status');
     const label = $('#status-label');
     badge.className = 'status-badge status-offline';
-    label.textContent = 'Backend Offline';
+    badge.title = 'Server Offline';
+    label.textContent = 'Server';
   }
 }
 

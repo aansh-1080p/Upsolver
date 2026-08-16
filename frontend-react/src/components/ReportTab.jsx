@@ -36,6 +36,83 @@ import {
   Legend
 } from 'recharts';
 
+function CustomChartTooltip({ active, payload, label }) {
+  if (!active || !payload || !payload.length) return null;
+  const item = payload[0];
+  const data = item?.payload || {};
+
+  if (data.platform === 'Codeforces' || data.cfRating !== undefined) {
+    const isDual = data.cfRating !== undefined;
+    return (
+      <div className="p-3 rounded-xl bg-[#2d3436] border border-[#4a5568] shadow-2xl text-[#f0f2f5] font-mono text-xs max-w-xs pointer-events-none z-50">
+        <div className="font-bold text-[#ff4757] text-[11px] mb-1.5 truncate">
+          {data.name || `Contest ${label}`}
+        </div>
+        <div className="space-y-1 text-[11px]">
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-[#a0aec0]">CF Rating:</span>
+            <span className="font-bold text-white text-sm">
+              {isDual ? (data.cfRating || '—') : data.rating}
+              {data.change !== undefined && data.change !== 0 && (
+                <span className={`ml-1.5 text-xs ${data.change > 0 ? 'text-[#10b981]' : 'text-[#ff4757]'}`}>
+                  ({data.change > 0 ? `+${data.change}` : data.change})
+                </span>
+              )}
+            </span>
+          </div>
+          {data.rank ? (
+            <div className="flex justify-between items-center gap-4">
+              <span className="text-[#a0aec0]">Rank:</span>
+              <span className="font-bold text-[#f59e0b]">#{data.rank}</span>
+            </div>
+          ) : null}
+          {isDual && data.lcRating && (
+            <div className="flex justify-between items-center gap-4 pt-1 border-t border-[#4a5568]/50">
+              <span className="text-[#ff4757]">LC Rating:</span>
+              <span className="font-bold text-white">{data.lcRating}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (data.platform === 'LeetCode') {
+    return (
+      <div className="p-3 rounded-xl bg-[#2d3436] border border-[#4a5568] shadow-2xl text-[#f0f2f5] font-mono text-xs max-w-xs pointer-events-none z-50">
+        <div className="font-bold text-[#ff4757] text-[11px] mb-1.5 truncate">
+          {data.name || `LeetCode Contest ${label}`}
+        </div>
+        <div className="space-y-1 text-[11px]">
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-[#a0aec0]">Rating:</span>
+            <span className="font-bold text-[#ff4757] text-sm">{data.rating}</span>
+          </div>
+          {data.rank ? (
+            <div className="flex justify-between items-center gap-4">
+              <span className="text-[#a0aec0]">Global Rank:</span>
+              <span className="font-bold text-[#f59e0b]">#{data.rank}</span>
+            </div>
+          ) : null}
+          {data.solved ? (
+            <div className="flex justify-between items-center gap-4">
+              <span className="text-[#a0aec0]">Solved:</span>
+              <span className="font-bold text-[#10b981]">{data.solved}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-2.5 rounded-lg bg-[#2d3436] border border-[#4a5568] text-white text-xs font-mono">
+      <div>{label}</div>
+      <div className="font-bold">{item.value}</div>
+    </div>
+  );
+}
+
 export default function ReportTab({ data, loading, onGenerateReport, cfHandle, lcHandle }) {
   const reportRef = useRef(null);
   const [activeChart, setActiveChart] = useState('auto');
@@ -453,22 +530,17 @@ export default function ReportTab({ data, loading, onGenerateReport, cfHandle, l
                     <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" vertical={false} />
                     <XAxis dataKey="contest" stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} tickLine={false} />
                     <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} domain={['dataMin - 50', 'dataMax + 50']} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#2d3436',
-                        borderColor: '#4a5568',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#f0f2f5',
-                        boxShadow: '4px 4px 12px rgba(0,0,0,0.2)'
-                      }}
-                      labelStyle={{ color: '#ff4757', fontWeight: 'bold' }}
-                      formatter={(val, name, item) => [
-                        `${val} Rating (Rank #${item.payload.rank || 'N/A'}${item.payload.solved ? ` · Solved ${item.payload.solved}` : ''})`,
-                        item.payload.name || 'LeetCode Contest'
-                      ]}
+                    <Tooltip content={<CustomChartTooltip />} cursor={{ stroke: '#ff4757', strokeWidth: 1.5, strokeDasharray: '3 3' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="rating"
+                      stroke="#ff4757"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#lcGrad)"
+                      dot={{ r: 2.5, fill: '#ff4757' }}
+                      activeDot={{ r: 6, fill: '#ff4757', stroke: '#ffffff', strokeWidth: 2 }}
                     />
-                    <Area type="monotone" dataKey="rating" stroke="#ff4757" strokeWidth={2.5} fillOpacity={1} fill="url(#lcGrad)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -486,19 +558,26 @@ export default function ReportTab({ data, loading, onGenerateReport, cfHandle, l
                     <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" vertical={false} />
                     <XAxis dataKey="contest" stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} tickLine={false} />
                     <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#2d3436',
-                        borderColor: '#4a5568',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#f0f2f5',
-                        boxShadow: '4px 4px 12px rgba(0,0,0,0.2)'
-                      }}
-                    />
+                    <Tooltip content={<CustomChartTooltip />} cursor={{ stroke: '#ff4757', strokeWidth: 1.5, strokeDasharray: '3 3' }} />
                     <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'JetBrains Mono', paddingTop: '8px' }} />
-                    <Line type="monotone" name={`Codeforces [${cf.handle || 'CF'}]`} dataKey="cfRating" stroke="#2d3436" strokeWidth={2.5} dot={{ r: 2 }} />
-                    <Line type="monotone" name={`LeetCode [${lc.username || 'LC'}]`} dataKey="lcRating" stroke="#ff4757" strokeWidth={2.5} dot={{ r: 2 }} />
+                    <Line
+                      type="monotone"
+                      name={`Codeforces [${cf.handle || 'CF'}]`}
+                      dataKey="cfRating"
+                      stroke="#2d3436"
+                      strokeWidth={2.5}
+                      dot={{ r: 2 }}
+                      activeDot={{ r: 6, fill: '#2d3436', stroke: '#ffffff', strokeWidth: 2 }}
+                    />
+                    <Line
+                      type="monotone"
+                      name={`LeetCode [${lc.username || 'LC'}]`}
+                      dataKey="lcRating"
+                      stroke="#ff4757"
+                      strokeWidth={2.5}
+                      dot={{ r: 2 }}
+                      activeDot={{ r: 6, fill: '#ff4757', stroke: '#ffffff', strokeWidth: 2 }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -522,22 +601,17 @@ export default function ReportTab({ data, loading, onGenerateReport, cfHandle, l
                     <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" vertical={false} />
                     <XAxis dataKey="contest" stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} tickLine={false} />
                     <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} domain={['dataMin - 100', 'dataMax + 100']} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#2d3436',
-                        borderColor: '#4a5568',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#f0f2f5',
-                        boxShadow: '4px 4px 12px rgba(0,0,0,0.2)'
-                      }}
-                      labelStyle={{ color: '#ff4757', fontWeight: 'bold' }}
-                      formatter={(val, name, item) => [
-                        `${val} Rating (Rank #${item.payload.rank || 'N/A'}${item.payload.change ? `, ${item.payload.change > 0 ? '+' : ''}${item.payload.change}` : ''})`,
-                        item.payload.name || 'Contest'
-                      ]}
+                    <Tooltip content={<CustomChartTooltip />} cursor={{ stroke: '#ff4757', strokeWidth: 1.5, strokeDasharray: '3 3' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="rating"
+                      stroke="#2d3436"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#cfGrad)"
+                      dot={{ r: 2.5, fill: '#2d3436' }}
+                      activeDot={{ r: 6, fill: '#ff4757', stroke: '#ffffff', strokeWidth: 2 }}
                     />
-                    <Area type="monotone" dataKey="rating" stroke="#2d3436" strokeWidth={2.5} fillOpacity={1} fill="url(#cfGrad)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
