@@ -4,8 +4,14 @@
    MV3 compliant: no eval, no inline scripts, async/await only.
    ═══════════════════════════════════════════════════════════════ */
 
-const API_BASE = 'http://localhost:8000/api';
-const WEB_APP_BASE = 'http://localhost:5173';
+let API_BASE = 'http://localhost:8000/api';
+let WEB_APP_BASE = 'http://localhost:5173';
+
+async function initConfig() {
+  const cfg = await storage.get(['upsolver_api_base', 'upsolver_webapp_base']);
+  if (cfg?.upsolver_api_base) API_BASE = cfg.upsolver_api_base;
+  if (cfg?.upsolver_webapp_base) WEB_APP_BASE = cfg.upsolver_webapp_base;
+}
 
 function openWebApp(tab = null) {
   const cf = $('#cf-handle')?.value?.trim() || '';
@@ -1344,6 +1350,9 @@ async function runFriendPeerBattle(friend) {
    ═══════════════════════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Load custom API configuration if present
+  await initConfig();
+
   // Health check
   await checkHealth();
 
