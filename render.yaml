@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: upsolver
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: groq
+      - key: ENV
+        value: production
