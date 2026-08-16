@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import HandleHeader from './components/HandleHeader';
 import ReportTab from './components/ReportTab';
 import PlanTab from './components/PlanTab';
 import ProblemsTab from './components/ProblemsTab';
-import CompareTab from './components/CompareTab';
+import FriendsTab from './components/FriendsTab';
 import {
   checkHealth,
   generateReport,
@@ -12,14 +12,15 @@ import {
   revisePlan,
   approvePlan,
   searchProblems,
-  comparePeers
+  comparePeers,
+  getSavedPlans
 } from './api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('report');
   const [health, setHealth] = useState(null);
 
-  // User handles
+  // User handles with initial state
   const [cfHandle, setCfHandle] = useState('Moderator');
   const [lcHandle, setLcHandle] = useState('doomscrollerfinalboss');
 
@@ -27,18 +28,129 @@ export default function App() {
   const [reportData, setReportData] = useState(null);
   const [planData, setPlanData] = useState(null);
   const [problemsData, setProblemsData] = useState(null);
-  const [compareData, setCompareData] = useState(null);
 
   // Loading States
   const [reportLoading, setReportLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [planActionLoading, setPlanActionLoading] = useState(false);
   const [problemsLoading, setProblemsLoading] = useState(false);
-  const [compareLoading, setCompareLoading] = useState(false);
 
   // Options
   const [difficulty, setDifficulty] = useState('medium');
   const [errorToast, setErrorToast] = useState(null);
+
+  // Parse URL query parameters & localStorage on initial mount
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const cfParam = params.get('cf');
+      const lcParam = params.get('lc');
+      const tabParam = params.get('tab');
+
+      let currentCf = 'Moderator';
+      let currentLc = 'doomscrollerfinalboss';
+
+      if (cfParam !== null) {
+        currentCf = cfParam;
+        setCfHandle(cfParam);
+        localStorage.setItem('upsolver_cf_handle', cfParam);
+      } else {
+        const savedCf = localStorage.getItem('upsolver_cf_handle');
+        if (savedCf) {
+          currentCf = savedCf;
+          setCfHandle(savedCf);
+        }
+      }
+
+      if (lcParam !== null) {
+        currentLc = lcParam;
+        setLcHandle(lcParam);
+        localStorage.setItem('upsolver_lc_handle', lcParam);
+      } else {
+        const savedLc = localStorage.getItem('upsolver_lc_handle');
+        if (savedLc) {
+          currentLc = savedLc;
+          setLcHandle(savedLc);
+        }
+      }
+
+      if (tabParam && ['report', 'plan', 'problems', 'friends'].includes(tabParam.toLowerCase())) {
+        setActiveTab(tabParam.toLowerCase());
+      }
+    } catch (e) {
+      console.error('Error parsing URL parameters:', e);
+    }
+  }, []);
+
+  // Persist handle updates
+  const handleUpdateCf = (val) => {
+    setCfHandle(val);
+    try {
+      localStorage.setItem('upsolver_cf_handle', val);
+    } catch (e) {}
+  };
+
+  const handleUpdateLc = (val) => {
+    setLcHandle(val);
+    try {
+      localStorage.setItem('upsolver_lc_handle', val);
+    } catch (e) {}
+  };
+
+  // Attempt to restore active saved plan when handles change
+  const restoreActivePlan = useCallback(async (cf, lc) => {
+    const key = `plan_${(cf || '').trim()}_${(lc || '').trim()}`;
+    // 1. Try local storage first for speed
+    try {
+      const localProgressRaw = localStorage.getItem(`upsolver_progress_${key}`);
+      const localProgress = localProgressRaw ? JSON.parse(localProgressRaw) : null;
+
+      const rawSavedPlans = localStorage.getItem('upsolver_saved_plans');
+      if (rawSavedPlans) {
+        const all = JSON.parse(rawSavedPlans);
+        if (all[key]?.plan) {
+          setPlanData({
+            plan: all[key].plan,
+            progress: localProgress || all[key].progress || { completedSubtopics: {}, completedDays: {}, weekStatus: {}, notes: {} }
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error restoring local plan:', e);
+    }
+
+    // 2. Query backend
+    try {
+      if (cf || lc) {
+        const res = await getSavedPlans(cf, lc);
+        const match = (res.plans || []).find((p) => p.key === key || (p.cf.toLowerCase() === cf.toLowerCase() && p.lc.toLowerCase() === lc.toLowerCase()));
+        if (match?.plan) {
+          setPlanData({
+            plan: match.plan,
+            progress: match.progress || { completedSubtopics: {}, completedDays: {}, weekStatus: {}, notes: {} }
+          });
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    restoreActivePlan(cfHandle, lcHandle);
+  }, [cfHandle, lcHandle, restoreActivePlan]);
+
+  // Attempt to restore cached report when handles change
+  useEffect(() => {
+    try {
+      const key = `upsolver_report_${(cfHandle || '').trim()}_${(lcHandle || '').trim()}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setReportData(JSON.parse(saved));
+      }
+    } catch (e) {}
+  }, [cfHandle, lcHandle]);
 
   // Fetch initial health status
   useEffect(() => {
@@ -62,8 +174,12 @@ export default function App() {
     }
     setReportLoading(true);
     try {
-      const res = await generateReport({ cf_username: cfHandle, lc_username: lcHandle });
+      const res = await generateReport({ cf_username: cfHandle.trim(), lc_username: lcHandle.trim() });
       setReportData(res);
+      try {
+        const key = `upsolver_report_${cfHandle.trim()}_${lcHandle.trim()}`;
+        localStorage.setItem(key, JSON.stringify(res));
+      } catch (e) {}
     } catch (err) {
       showError(err.message || 'Failed to generate report');
     } finally {
@@ -144,29 +260,30 @@ export default function App() {
     }
   };
 
-  // 4. Peer Comparison
-  const handleCompare = async ({ peer_cf, peer_lc }) => {
+  // 4. Peer Comparison (called from Friends tab inline)
+  const handleCompare = async (params = {}) => {
+    const targetPeerCf = (params.peer_cf ?? '').trim();
+    const targetPeerLc = (params.peer_lc ?? '').trim();
+
     if (!cfHandle.trim() && !lcHandle.trim()) {
-      showError('Please enter your primary handles in the top bar first.');
-      return;
+      showError('Please enter your primary handles first.');
+      return null;
     }
-    if (!peer_cf.trim() && !peer_lc.trim()) {
+    if (!targetPeerCf && !targetPeerLc) {
       showError("Please enter your peer's Codeforces or LeetCode handle.");
-      return;
+      return null;
     }
-    setCompareLoading(true);
     try {
       const res = await comparePeers({
-        cf_username: cfHandle,
-        lc_username: lcHandle,
-        peer_cf,
-        peer_lc,
+        cf_username: cfHandle.trim(),
+        lc_username: lcHandle.trim(),
+        peer_cf: targetPeerCf,
+        peer_lc: targetPeerLc,
       });
-      setCompareData(res);
+      return res;
     } catch (err) {
       showError(err.message || 'Failed to compare profiles');
-    } finally {
-      setCompareLoading(false);
+      return null;
     }
   };
 
@@ -186,47 +303,58 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Handle Inputs */}
-        <HandleHeader
-          cfHandle={cfHandle}
-          setCfHandle={setCfHandle}
-          lcHandle={lcHandle}
-          setLcHandle={setLcHandle}
-          onRun={
-            activeTab === 'report'
-              ? handleGenerateReport
-              : activeTab === 'plan'
-              ? () => handleGeneratePlan({ goal: 'Improve competitive programming skills' })
-              : activeTab === 'problems'
-              ? handleSearchProblems
-              : undefined
-          }
-          loading={reportLoading || planLoading || problemsLoading}
-          actionText={
-            activeTab === 'report'
-              ? 'Execute Report'
-              : activeTab === 'plan'
-              ? 'Synthesize Plan'
-              : activeTab === 'problems'
-              ? 'Discover Problems'
-              : 'Execute Pipeline'
-          }
-        />
+        {/* Handle Inputs (Shown on Report, Plan, and Problems tabs; Friends has integrated arena) */}
+        {activeTab !== 'friends' && (
+          <HandleHeader
+            cfHandle={cfHandle}
+            setCfHandle={handleUpdateCf}
+            lcHandle={lcHandle}
+            setLcHandle={handleUpdateLc}
+            onRun={
+              activeTab === 'report'
+                ? handleGenerateReport
+                : activeTab === 'plan'
+                ? () => handleGeneratePlan({ goal: 'Improve competitive programming skills' })
+                : activeTab === 'problems'
+                ? handleSearchProblems
+                : undefined
+            }
+            loading={reportLoading || planLoading || problemsLoading}
+            actionText={
+              activeTab === 'report'
+                ? 'Execute Report'
+                : activeTab === 'plan'
+                ? 'Synthesize Plan'
+                : activeTab === 'problems'
+                ? 'Discover Problems'
+                : 'Execute Pipeline'
+            }
+          />
+        )}
 
         {/* Tab Content */}
         <div>
           {activeTab === 'report' && (
-            <ReportTab data={reportData} loading={reportLoading} />
+            <ReportTab
+              data={reportData}
+              loading={reportLoading}
+              onGenerateReport={handleGenerateReport}
+              cfHandle={cfHandle}
+              lcHandle={lcHandle}
+            />
           )}
 
           {activeTab === 'plan' && (
             <PlanTab
               planData={planData}
+              setPlanData={setPlanData}
               loading={planLoading}
               onGeneratePlan={handleGeneratePlan}
               onRevisePlan={handleRevisePlan}
               onApprovePlan={handleApprovePlan}
               actionLoading={planActionLoading}
+              cfHandle={cfHandle}
+              lcHandle={lcHandle}
             />
           )}
 
@@ -240,13 +368,11 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'compare' && (
-            <CompareTab
-              compareData={compareData}
-              loading={compareLoading}
+          {activeTab === 'friends' && (
+            <FriendsTab
               onCompare={handleCompare}
-              hostCf={cfHandle}
-              hostLc={lcHandle}
+              cfHandle={cfHandle}
+              lcHandle={lcHandle}
             />
           )}
         </div>
@@ -264,5 +390,3 @@ export default function App() {
     </div>
   );
 }
-
-

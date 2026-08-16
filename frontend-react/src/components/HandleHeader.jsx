@@ -72,25 +72,27 @@ export default function HandleHeader({
         </div>
 
         {/* Primary Safety-Orange Push Button */}
-        <div className="flex items-center">
-          <button
-            onClick={onRun}
-            disabled={loading || (!cfHandle.trim() && !lcHandle.trim())}
-            className="btn-industrial-primary w-full sm:w-auto h-[44px] px-7"
-          >
-            {loading ? (
-              <>
-                <span className="inline-block animate-spin">⟳</span>
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <Play className="h-3.5 w-3.5 fill-white" />
-                <span>{actionText}</span>
-              </>
-            )}
-          </button>
-        </div>
+        {onRun && (
+          <div className="flex items-center">
+            <button
+              onClick={onRun}
+              disabled={loading || (!cfHandle.trim() && !lcHandle.trim())}
+              className="btn-industrial-primary w-full sm:w-auto h-[44px] px-7"
+            >
+              {loading ? (
+                <>
+                  <span className="inline-block animate-spin">⟳</span>
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-3.5 w-3.5 fill-white" />
+                  <span>{actionText}</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Preset Profiles Bar */}

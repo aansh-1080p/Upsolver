@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Activity, Sparkles, Zap, Shield } from 'lucide-react';
+import { Activity, Sparkles, Zap, Shield, Users } from 'lucide-react';
 
 export default function Navbar({ health, activeTab, setActiveTab }) {
   const isOnline = health?.status === 'online';
@@ -8,7 +8,7 @@ export default function Navbar({ health, activeTab, setActiveTab }) {
     { id: 'report', code: '01', label: 'Report', icon: Activity },
     { id: 'plan', code: '02', label: 'Study Plan', icon: Sparkles },
     { id: 'problems', code: '03', label: 'Problems', icon: Zap },
-    { id: 'compare', code: '04', label: 'Peer Duel', icon: Cpu },
+    { id: 'friends', code: '04', label: 'Friends', icon: Users },
   ];
 
   return (

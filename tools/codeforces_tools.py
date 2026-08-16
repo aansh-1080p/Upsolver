@@ -172,3 +172,33 @@ async def fetch_all_cf_data(handle: str) -> dict:
             [user_info.get("error")] if "error" in user_info else []
         ),
     }
+
+
+async def fetch_cf_contests() -> list:
+    """Fetch upcoming, live, and recent Codeforces contests."""
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await _get(client, "contest.list", {"gym": False})
+            return res or []
+        except Exception:
+            return []
+
+
+async def fetch_cf_contest_standings(contest_id: int, handles: list) -> list:
+    """Fetch participant standings for specified handles in a contest."""
+    if not handles or not contest_id:
+        return []
+    async with httpx.AsyncClient() as client:
+        try:
+            handles_str = ";".join([h.strip() for h in handles if h and h.strip()])
+            if not handles_str:
+                return []
+            res = await _get(client, "contest.standings", {
+                "contestId": contest_id,
+                "handles": handles_str,
+                "showUnofficial": True
+            })
+            return res.get("rows", [])
+        except Exception:
+            return []
+

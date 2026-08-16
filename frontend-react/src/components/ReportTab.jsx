@@ -11,7 +11,6 @@ import {
   Flame,
   CheckCircle2,
   Clock,
-  Zap,
   ShieldCheck,
   Compass,
   ArrowUpRight,
@@ -21,7 +20,8 @@ import {
   Sparkles,
   SlidersHorizontal,
   Code2,
-  User
+  User,
+  RefreshCw
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -36,10 +36,94 @@ import {
   Legend
 } from 'recharts';
 
-export default function ReportTab({ data, loading }) {
+export default function ReportTab({ data, loading, onGenerateReport, cfHandle, lcHandle }) {
   const reportRef = useRef(null);
   const [activeChart, setActiveChart] = useState('auto');
 
+  // Extract data safely (empty objects when no data yet)
+  const { cf_data: cf = {}, lc_data: lc = {}, analysis: an = {}, report_markdown = '', errors = [] } = data || {};
+
+  // ALL hooks must be called unconditionally (before any early return)
+  const cfContestHistory = useMemo(() => {
+    return (cf.contest_history || []).map((c, i) => ({
+      contest: c.contestName ? `#${i + 1}` : `#${i + 1}`,
+      name: c.contestName || `Round ${i + 1}`,
+      rating: c.newRating,
+      rank: c.rank,
+      change: c.newRating - c.oldRating,
+      platform: 'Codeforces'
+    }));
+  }, [cf.contest_history]);
+
+  const lcContestHistory = useMemo(() => {
+    const raw = lc.contest_history || [];
+    const attended = raw.filter(c => c.attended && (c.rating > 0 || c.ranking > 0));
+    return attended.map((c, i) => ({
+      contest: `#${i + 1}`,
+      name: c.contestName || `LC Contest ${i + 1}`,
+      rating: Math.round(c.rating || 0),
+      rank: c.ranking,
+      solved: c.problemsSolved !== undefined ? `${c.problemsSolved}/${c.totalProblems || 4}` : undefined,
+      platform: 'LeetCode'
+    }));
+  }, [lc.contest_history]);
+
+  const dualContestHistory = useMemo(() => {
+    const maxLen = Math.max(cfContestHistory.length, lcContestHistory.length);
+    const combined = [];
+    for (let i = 0; i < maxLen; i++) {
+      combined.push({
+        contest: `#${i + 1}`,
+        cfRating: cfContestHistory[i]?.rating || null,
+        lcRating: lcContestHistory[i]?.rating || null,
+        cfName: cfContestHistory[i]?.name,
+        lcName: lcContestHistory[i]?.name,
+      });
+    }
+    return combined;
+  }, [cfContestHistory, lcContestHistory]);
+
+  const currentChartMode = useMemo(() => {
+    if (activeChart !== 'auto') return activeChart;
+    if (cfContestHistory.length > 0 && lcContestHistory.length > 0) return 'cf';
+    if (lcContestHistory.length > 0) return 'lc';
+    return 'cf';
+  }, [activeChart, cfContestHistory.length, lcContestHistory.length]);
+
+  // Derived stats (safe even when data is null)
+  const consistencyPct = an.consistency_score ? Math.round(an.consistency_score * 100) : 0;
+  const waPct = an.wa_rate ? Math.round(an.wa_rate * 100) : (an._cf?.wa_rate ? Math.round(an._cf.wa_rate * 100) : null);
+  const tlePct = an.tle_rate ? Math.round(an.tle_rate * 100) : (an._cf?.tle_rate ? Math.round(an._cf.tle_rate * 100) : null);
+  const peakHour = an.peak_solving_hour !== undefined ? an.peak_solving_hour : an._cf?.peak_hour;
+  const avgDelta = an.avg_rating_change !== undefined ? an.avg_rating_change : an._cf?.avg_rating_change;
+  const bestRank = an.best_contest_rank || an._cf?.best_rank;
+
+  const narrativeRaw = an.narrative || report_markdown || '';
+  const narrativeParagraphs = narrativeRaw
+    .split(/\n\n+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 0 && !p.startsWith('#'));
+
+  const overviewText = narrativeParagraphs[0] || 'Overall competitive programming profile active across Codeforces and LeetCode benchmarks.';
+  const weaknessText = narrativeParagraphs[1] || 'Algorithmic bottlenecks identified in complex topic areas.';
+  const actionText = narrativeParagraphs[2] || 'Focus on structured deliberate practice targeting high-error algorithm categories.';
+
+  const handleExportPDF = () => {
+    if (window.html2pdf && reportRef.current) {
+      const opt = {
+        margin: 10,
+        filename: `Upsolver_Performance_Report_${cf.handle || 'User'}_${lc.username || ''}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#e0e5ec' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      window.html2pdf().set(opt).from(reportRef.current).save();
+    } else {
+      window.print();
+    }
+  };
+
+  // --- Early returns AFTER all hooks ---
   if (loading) {
     return (
       <div className="industrial-card corner-screws p-12 text-center border border-white/60">
@@ -58,104 +142,17 @@ export default function ReportTab({ data, loading }) {
     return (
       <div className="industrial-card corner-screws p-12 text-center border border-white/60">
         <div className="h-12 w-12 rounded-2xl bg-[#d8e0ea] shadow-[inset_2px_2px_5px_#babecc,inset_-2px_-2px_5px_#ffffff] flex items-center justify-center mx-auto mb-4">
-          <FileText className="h-6 w-6 text-[#718096]" />
+          <FileText className="h-6 w-6 text-[#ff4757]" />
         </div>
         <h3 className="text-lg font-extrabold text-[#2d3436] text-embossed">
           No Performance Report Loaded
         </h3>
-        <p className="text-xs text-[#4a5568] mt-1 max-w-md mx-auto">
-          Enter your Codeforces and LeetCode handles above and click <strong>[Execute Report]</strong> to generate your tailored analytics report.
+        <p className="text-xs text-[#4a5568] mt-1.5 max-w-md mx-auto">
+          Enter your handles above and click <strong className="text-[#ff4757] font-mono">Execute Report</strong> to generate your performance analysis.
         </p>
       </div>
     );
   }
-
-  const { cf_data: cf = {}, lc_data: lc = {}, analysis: an = {}, report_markdown = '', errors = [] } = data;
-
-  // Codeforces rating history
-  const cfContestHistory = useMemo(() => {
-    return (cf.contest_history || []).map((c, i) => ({
-      contest: c.contestName ? `#${i + 1}` : `#${i + 1}`,
-      name: c.contestName || `Round ${i + 1}`,
-      rating: c.newRating,
-      rank: c.rank,
-      change: c.newRating - c.oldRating,
-      platform: 'Codeforces'
-    }));
-  }, [cf.contest_history]);
-
-  // LeetCode contest rating history (extract attended rated contests)
-  const lcContestHistory = useMemo(() => {
-    const raw = lc.contest_history || [];
-    const attended = raw.filter(c => c.attended && (c.rating > 0 || c.ranking > 0));
-    return attended.map((c, i) => ({
-      contest: `#${i + 1}`,
-      name: c.contestName || `LC Contest ${i + 1}`,
-      rating: Math.round(c.rating || 0),
-      rank: c.ranking,
-      solved: c.problemsSolved !== undefined ? `${c.problemsSolved}/${c.totalProblems || 4}` : undefined,
-      platform: 'LeetCode'
-    }));
-  }, [lc.contest_history]);
-
-  // Dual Synchronized Contest History
-  const dualContestHistory = useMemo(() => {
-    const maxLen = Math.max(cfContestHistory.length, lcContestHistory.length);
-    const combined = [];
-    for (let i = 0; i < maxLen; i++) {
-      combined.push({
-        contest: `#${i + 1}`,
-        cfRating: cfContestHistory[i]?.rating || null,
-        lcRating: lcContestHistory[i]?.rating || null,
-        cfName: cfContestHistory[i]?.name,
-        lcName: lcContestHistory[i]?.name,
-      });
-    }
-    return combined;
-  }, [cfContestHistory, lcContestHistory]);
-
-  // Determine current active chart mode
-  const currentChartMode = useMemo(() => {
-    if (activeChart !== 'auto') return activeChart;
-    if (cfContestHistory.length > 0 && lcContestHistory.length > 0) return 'cf';
-    if (lcContestHistory.length > 0) return 'lc';
-    return 'cf';
-  }, [activeChart, cfContestHistory.length, lcContestHistory.length]);
-
-  // Consistency & Accuracy Stats
-  const consistencyPct = an.consistency_score ? Math.round(an.consistency_score * 100) : 0;
-  const waPct = an.wa_rate ? Math.round(an.wa_rate * 100) : (an._cf?.wa_rate ? Math.round(an._cf.wa_rate * 100) : null);
-  const tlePct = an.tle_rate ? Math.round(an.tle_rate * 100) : (an._cf?.tle_rate ? Math.round(an._cf.tle_rate * 100) : null);
-  const peakHour = an.peak_solving_hour !== undefined ? an.peak_solving_hour : an._cf?.peak_hour;
-  const avgDelta = an.avg_rating_change !== undefined ? an.avg_rating_change : an._cf?.avg_rating_change;
-  const bestRank = an.best_contest_rank || an._cf?.best_rank;
-
-  // Breakdown of narrative / report into structured sections
-  const narrativeRaw = an.narrative || report_markdown || '';
-  const narrativeParagraphs = narrativeRaw
-    .split(/\n\n+/)
-    .map(p => p.trim())
-    .filter(p => p.length > 0 && !p.startsWith('#'));
-
-  const overviewText = narrativeParagraphs[0] || 'Overall competitive programming profile active across Codeforces and LeetCode benchmarks.';
-  const weaknessText = narrativeParagraphs[1] || 'Algorithmic bottlenecks identified in complex topic areas.';
-  const actionText = narrativeParagraphs[2] || 'Focus on structured deliberate practice targeting high-error algorithm categories.';
-
-  // Client-side PDF export
-  const handleExportPDF = () => {
-    if (window.html2pdf && reportRef.current) {
-      const opt = {
-        margin: 10,
-        filename: `Upsolver_Performance_Report_${cf.handle || 'User'}_${lc.username || ''}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#e0e5ec' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      window.html2pdf().set(opt).from(reportRef.current).save();
-    } else {
-      window.print();
-    }
-  };
 
   return (
     <div className="space-y-6" ref={reportRef}>
@@ -199,6 +196,15 @@ export default function ReportTab({ data, loading }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={onGenerateReport}
+              disabled={loading}
+              className="btn-industrial-secondary py-2 px-3.5 text-xs font-mono flex items-center gap-1.5"
+              title="Refresh / Re-generate this Diagnostic Report"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-[#ff4757] ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh Audit</span>
+            </button>
             <button
               onClick={handleExportPDF}
               className="btn-industrial-secondary py-2 px-4 text-xs font-mono flex items-center gap-1.5"
@@ -290,7 +296,7 @@ export default function ReportTab({ data, loading }) {
           <p className="text-2xl font-black text-[#2d3436] font-mono mt-2 text-embossed">{cf.solved_count || 0}</p>
           <div className="mt-1 pt-1.5 border-t border-[#babecc]/30 flex items-center justify-between text-[10px] font-mono">
             <span className="text-[#718096]">Contests:</span>
-            <span className="font-bold text-[#2d3436]">{cf.contests_count || 0}</span>
+            <span className="font-bold text-[#2d3436]">{cf.contest_history?.length || an._cf?.cf_contests || 0}</span>
           </div>
         </div>
       </div>

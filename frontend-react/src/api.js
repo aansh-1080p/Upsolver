@@ -98,3 +98,90 @@ export async function comparePeers({ cf_username, lc_username, peer_cf, peer_lc 
   }
   return await res.json();
 }
+
+export async function getSavedPlans(cf_username, lc_username) {
+  let url = `${API_BASE}/plans`;
+  const params = new URLSearchParams();
+  if (cf_username) params.append('cf_username', cf_username);
+  if (lc_username) params.append('lc_username', lc_username);
+  const qs = params.toString();
+  if (qs) url += `?${qs}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to fetch saved plans' }));
+    throw new Error(err.detail || 'Failed to fetch saved plans');
+  }
+  return await res.json();
+}
+
+export async function getSinglePlan(key) {
+  const res = await fetch(`${API_BASE}/plans/${encodeURIComponent(key)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to fetch plan' }));
+    throw new Error(err.detail || 'Failed to fetch plan');
+  }
+  return await res.json();
+}
+
+export async function savePlanToServer({ cf_username, lc_username, plan, label, progress }) {
+  const res = await fetch(`${API_BASE}/plans/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cf_username, lc_username, plan, label, progress }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to save plan' }));
+    throw new Error(err.detail || 'Failed to save plan');
+  }
+  return await res.json();
+}
+
+export async function updatePlanProgress(key, progress) {
+  const res = await fetch(`${API_BASE}/plans/progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, progress }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update plan progress' }));
+    throw new Error(err.detail || 'Failed to update plan progress');
+  }
+  return await res.json();
+}
+
+export async function deletePlanFromServer(key) {
+  const res = await fetch(`${API_BASE}/plans/${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete plan' }));
+    throw new Error(err.detail || 'Failed to delete plan');
+  }
+  return await res.json();
+}
+
+export async function getContests(handles = '') {
+  let url = `${API_BASE}/contests`;
+  if (handles) url += `?handles=${encodeURIComponent(handles)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to fetch contests' }));
+    throw new Error(err.detail || 'Failed to fetch contests');
+  }
+  return await res.json();
+}
+
+export async function refreshFriendsBatch(friends = []) {
+  const res = await fetch(`${API_BASE}/friends/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ friends }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to refresh friends' }));
+    throw new Error(err.detail || 'Failed to refresh friends');
+  }
+  return await res.json();
+}
+

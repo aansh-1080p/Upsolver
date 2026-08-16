@@ -5,6 +5,8 @@ Exposes LangGraph agent workflows as high-performance REST APIs for React fronte
 
 import os
 import uuid
+import json
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +37,22 @@ app.add_middleware(
 
 # Global compiled LangGraph instance with checkpointer
 _graph = None
+
+SAVED_PLANS_FILE = os.path.join(os.path.dirname(__file__), "output", "saved_plans.json")
+
+def _load_saved_plans() -> dict:
+    if os.path.exists(SAVED_PLANS_FILE):
+        try:
+            with open(SAVED_PLANS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def _save_saved_plans(data: dict):
+    os.makedirs(os.path.dirname(SAVED_PLANS_FILE), exist_ok=True)
+    with open(SAVED_PLANS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 def get_agent_graph():
     global _graph
@@ -67,6 +85,17 @@ class PlanReviseRequest(BaseModel):
 class PlanApproveRequest(BaseModel):
     cf_username: str
     lc_username: str
+
+class SavePlanRequest(BaseModel):
+    cf_username: str
+    lc_username: str
+    plan: Dict[str, Any]
+    label: Optional[str] = None
+    progress: Optional[Dict[str, Any]] = None
+
+class UpdatePlanProgressRequest(BaseModel):
+    key: str
+    progress: Dict[str, Any]
 
 class ProblemSearchRequest(BaseModel):
     cf_username: str
@@ -288,14 +317,121 @@ async def approve_plan(req: PlanApproveRequest):
         final_state = final_snap.values or {}
         plan = final_state.get("plan") or {}
 
+        # Auto-persist approved plan to saved_plans.json
+        key = f"plan_{req.cf_username.strip()}_{req.lc_username.strip()}"
+        weeks_count = len(plan.get("weeks") or [])
+        label = f"{req.cf_username or '?'}/{req.lc_username or '?'} — {weeks_count} weeks"
+        now_str = datetime.now(timezone.utc).isoformat()
+
+        all_plans = _load_saved_plans()
+        existing = all_plans.get(key, {})
+        existing_progress = existing.get("progress") or {
+            "completedSubtopics": {},
+            "completedDays": {},
+            "weekStatus": {},
+            "notes": {},
+        }
+
+        entry = {
+            "key": key,
+            "cf": req.cf_username.strip(),
+            "lc": req.lc_username.strip(),
+            "plan": plan,
+            "savedAt": now_str,
+            "updatedAt": now_str,
+            "label": label,
+            "status": "approved",
+            "progress": existing_progress,
+        }
+        all_plans[key] = entry
+        _save_saved_plans(all_plans)
+
         return {
             "success": True,
             "status": "approved",
             "plan": plan,
+            "saved_entry": entry,
             "errors": final_state.get("errors", []),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Plan approval error: {str(e)}")
+
+
+@app.get("/api/plans")
+async def get_saved_plans(cf_username: Optional[str] = None, lc_username: Optional[str] = None):
+    all_plans = _load_saved_plans()
+    result = list(all_plans.values())
+    if cf_username:
+        result = [p for p in result if p.get("cf", "").lower() == cf_username.lower().strip()]
+    if lc_username:
+        result = [p for p in result if p.get("lc", "").lower() == lc_username.lower().strip()]
+    # Sort by updatedAt descending
+    result.sort(key=lambda x: x.get("updatedAt", x.get("savedAt", "")), reverse=True)
+    return {"success": True, "plans": result}
+
+
+@app.get("/api/plans/{key}")
+async def get_single_plan(key: str):
+    all_plans = _load_saved_plans()
+    if key not in all_plans:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return {"success": True, "plan": all_plans[key]}
+
+
+@app.post("/api/plans/save")
+async def save_custom_plan(req: SavePlanRequest):
+    key = f"plan_{req.cf_username.strip()}_{req.lc_username.strip()}"
+    weeks_count = len(req.plan.get("weeks") or [])
+    label = req.label or f"{req.cf_username or '?'}/{req.lc_username or '?'} — {weeks_count} weeks"
+    now_str = datetime.now(timezone.utc).isoformat()
+
+    all_plans = _load_saved_plans()
+    existing = all_plans.get(key, {})
+    progress = req.progress or existing.get("progress") or {
+        "completedSubtopics": {},
+        "completedDays": {},
+        "weekStatus": {},
+        "notes": {},
+    }
+
+    entry = {
+        "key": key,
+        "cf": req.cf_username.strip(),
+        "lc": req.lc_username.strip(),
+        "plan": req.plan,
+        "savedAt": existing.get("savedAt", now_str),
+        "updatedAt": now_str,
+        "label": label,
+        "status": req.plan.get("status", "approved"),
+        "progress": progress,
+    }
+    all_plans[key] = entry
+    _save_saved_plans(all_plans)
+    return {"success": True, "saved_entry": entry}
+
+
+@app.post("/api/plans/progress")
+async def update_plan_progress(req: UpdatePlanProgressRequest):
+    all_plans = _load_saved_plans()
+    if req.key not in all_plans:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    entry = all_plans[req.key]
+    entry["progress"] = req.progress
+    entry["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    all_plans[req.key] = entry
+    _save_saved_plans(all_plans)
+    return {"success": True, "saved_entry": entry}
+
+
+@app.delete("/api/plans/{key}")
+async def delete_saved_plan(key: str):
+    all_plans = _load_saved_plans()
+    if key in all_plans:
+        del all_plans[key]
+        _save_saved_plans(all_plans)
+        return {"success": True, "message": f"Plan {key} deleted"}
+    raise HTTPException(status_code=404, detail="Plan not found")
 
 
 @app.post("/api/problems")
@@ -375,6 +511,124 @@ async def compare_peers(req: CompareRequest):
         raise HTTPException(status_code=500, detail=f"Comparison error: {str(e)}")
 
 
+@app.get("/api/contests")
+async def get_contests(handles: Optional[str] = None):
+    """
+    Fetch live and upcoming contests from Codeforces and LeetCode.
+    If any contest is active, optionally fetches live standing for passed handles.
+    """
+    from tools.codeforces_tools import fetch_cf_contests, fetch_cf_contest_standings
+    import asyncio
+    
+    handles_list = [h.strip() for h in (handles or "").split(",") if h.strip()]
+    cf_all = await fetch_cf_contests()
+    
+    live_contests = []
+    upcoming_contests = []
+    
+    # Process Codeforces Contests
+    for c in cf_all:
+        phase = c.get("phase")
+        if phase in ("CODING", "PENDING_SYSTEM_TEST"):
+            live_contests.append({
+                "id": c.get("id"),
+                "name": c.get("name"),
+                "platform": "Codeforces",
+                "phase": "LIVE",
+                "durationSeconds": c.get("durationSeconds", 7200),
+                "startTimeSeconds": c.get("startTimeSeconds", 0),
+                "relativeTimeSeconds": c.get("relativeTimeSeconds", 0),
+                "url": f"https://codeforces.com/contest/{c.get('id')}",
+            })
+        elif phase == "BEFORE":
+            upcoming_contests.append({
+                "id": c.get("id"),
+                "name": c.get("name"),
+                "platform": "Codeforces",
+                "phase": "UPCOMING",
+                "durationSeconds": c.get("durationSeconds", 7200),
+                "startTimeSeconds": c.get("startTimeSeconds", 0),
+                "relativeTimeSeconds": c.get("relativeTimeSeconds", 0),
+                "url": f"https://codeforces.com/contests",
+            })
+    
+    # Sort upcoming by start time ascending
+    upcoming_contests.sort(key=lambda x: x.get("startTimeSeconds", 0))
+    upcoming_contests = upcoming_contests[:8]
+
+    # Fetch live standings if there are live contests and handles
+    standings_map = {}
+    if live_contests and handles_list:
+        for lc in live_contests:
+            rows = await fetch_cf_contest_standings(lc["id"], handles_list)
+            for r in rows:
+                party = r.get("party", {})
+                members = party.get("members", [])
+                for m in members:
+                    h = m.get("handle")
+                    if h:
+                        standings_map[h.lower()] = {
+                            "contest_name": lc["name"],
+                            "rank": r.get("rank"),
+                            "points": r.get("points"),
+                            "penalty": r.get("penalty"),
+                        }
+
+    return {
+        "success": True,
+        "live": live_contests,
+        "upcoming": upcoming_contests,
+        "live_standings": standings_map,
+    }
+
+
+class FriendsBatchRequest(BaseModel):
+    friends: List[Dict[str, Any]]
+
+
+@app.post("/api/friends/refresh")
+async def refresh_friends_batch(req: FriendsBatchRequest):
+    """
+    Refresh ratings, max ratings, ranks, and exact solved problems count
+    for a list of friends across Codeforces and LeetCode concurrently.
+    """
+    from tools.codeforces_tools import fetch_all_cf_data, fetch_cf_contests, fetch_cf_contest_standings
+    from tools.leetcode_tools import fetch_all_lc_data
+    import asyncio
+
+    async def _fetch_single_friend(f: dict) -> dict:
+        cf_handle = (f.get("cf") or "").strip()
+        lc_username = (f.get("lc") or "").strip()
+        
+        cf_task = fetch_all_cf_data(cf_handle) if cf_handle else asyncio.sleep(0, result={})
+        lc_task = fetch_all_lc_data(lc_username) if lc_username else asyncio.sleep(0, result={})
+        
+        cf_res, lc_res = await asyncio.gather(cf_task, lc_task, return_exceptions=True)
+        
+        cf_dict = cf_res if isinstance(cf_res, dict) else {}
+        lc_dict = lc_res if isinstance(lc_res, dict) else {}
+        
+        return {
+            **f,
+            "cf": cf_handle,
+            "lc": lc_username,
+            "name": f.get("name") or cf_handle or lc_username or "Friend",
+            "cfRating": cf_dict.get("rating", f.get("cfRating", 0)),
+            "cfMaxRating": cf_dict.get("max_rating", f.get("cfMaxRating", 0)),
+            "cfRank": cf_dict.get("rank", f.get("cfRank", "unrated")),
+            "cfSolved": cf_dict.get("solved_count", f.get("cfSolved", 0)),
+            "lcRating": round(lc_dict.get("contest_rating", 0)) if lc_dict.get("contest_rating") else f.get("lcRating", 0),
+            "lcSolved": lc_dict.get("total_solved", f.get("lcSolved", 0)),
+            "lastUpdated": int(datetime.now(timezone.utc).timestamp() * 1000),
+        }
+
+    tasks = [_fetch_single_friend(f) for f in req.friends]
+    results = await asyncio.gather(*tasks, return_exceptions=False)
+    
+    return {"success": True, "friends": results}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+

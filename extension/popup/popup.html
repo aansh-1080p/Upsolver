@@ -19,9 +19,15 @@
         <span class="header-sub">Competitive Programming Intelligence</span>
       </div>
     </div>
-    <div id="backend-status" class="status-badge status-offline">
-      <span class="status-dot"></span>
-      <span id="status-label">Connecting…</span>
+    <div class="header-right">
+      <button id="open-site-btn" class="btn-open-site" title="Launch Full Dashboard (localhost:5173)" type="button">
+        <span>Web App</span>
+        <span class="site-icon">↗</span>
+      </button>
+      <div id="backend-status" class="status-badge status-offline">
+        <span class="status-dot"></span>
+        <span id="status-label">Connecting…</span>
+      </div>
     </div>
   </header>
 
@@ -48,7 +54,6 @@
     <button class="tab-btn active" data-tab="report">Report</button>
     <button class="tab-btn" data-tab="plan">Study Plan</button>
     <button class="tab-btn" data-tab="problems">Problems</button>
-    <button class="tab-btn" data-tab="compare">Compare</button>
     <button class="tab-btn" data-tab="friends">Friends <span id="friends-count-badge" class="count-badge">0</span></button>
   </nav>
 
@@ -155,6 +160,20 @@
         </div>
       </div>
 
+      <!-- Web Tracker Banner -->
+      <div class="card web-sync-card">
+        <div class="web-sync-info">
+          <span class="web-sync-icon">🎯</span>
+          <div class="web-sync-text">
+            <strong>Interactive Weekly Tracker</strong>
+            <p class="subtitle">Open full study plan console with checklists and milestones</p>
+          </div>
+        </div>
+        <button id="open-plan-site-btn" class="btn-secondary text-xs" style="padding: 5px 10px;" type="button">
+          <span>Track on Web ↗</span>
+        </button>
+      </div>
+
       <!-- Plan Loading -->
       <div id="plan-loading" class="loading-state" hidden>
         <div class="spinner-lg"></div>
@@ -232,93 +251,20 @@
       </div>
     </section>
 
-    <!-- ═══════ COMPARE TAB ═══════ -->
-    <section id="tab-compare" class="tab-panel">
-      <!-- Peer Inputs -->
-      <div class="card">
-        <div class="card-header">
-          <h3>Head-to-Head Comparison</h3>
-          <button id="save-competitor-btn" class="btn-secondary text-xs" style="padding: 3px 8px;" type="button">
-            <span>+ Save Friend</span>
-          </button>
-        </div>
-        
-        <!-- Quick Duel Friends Bar -->
-        <div id="compare-friends-quickbar" class="friend-quick-duel-bar" hidden>
-          <span class="control-label">⚔️ Quick Duel Friend:</span>
-          <div id="compare-friends-chips" class="friend-chips-row"></div>
-        </div>
-
-        <div class="compare-inputs">
-          <div class="input-group">
-            <label for="peer-cf">Competitor CF Handle</label>
-            <input type="text" id="peer-cf" placeholder="e.g. tourist" value="Ravindra19">
-          </div>
-          <div class="input-group">
-            <label for="peer-lc">Competitor LC Username</label>
-            <input type="text" id="peer-lc" placeholder="e.g. neal_wu" value="Ravindra056">
-          </div>
-        </div>
-        <div class="card-actions">
-          <button id="compare-run-btn" class="btn-primary">Run Comparison</button>
-        </div>
-      </div>
-
-      <!-- Loading -->
-      <div id="compare-loading" class="loading-state" hidden>
-        <div class="spinner-lg"></div>
-        <p>Fetching competitor data…</p>
-      </div>
-
-      <!-- Compare Content -->
-      <div id="compare-content" hidden>
-        <!-- Side by Side Cards -->
-        <div class="compare-cards">
-          <div id="compare-you" class="card compare-card compare-you"></div>
-          <div id="compare-peer" class="card compare-card compare-peer"></div>
-        </div>
-
-        <!-- Dual Chart -->
-        <div class="card chart-card">
-          <div class="card-header">
-            <h3>Rating Progression Overlay</h3>
-          </div>
-          <canvas id="compare-chart" width="720" height="220"></canvas>
-        </div>
-
-        <!-- Tag Breakdown -->
-        <div class="compare-tags-grid">
-          <div class="card">
-            <h4 class="tag-section-title warn-title">⚠ Both Struggle</h4>
-            <div id="common-weak-list" class="tag-list"></div>
-          </div>
-          <div class="card">
-            <h4 class="tag-section-title good-title">🔵 Your Edge</h4>
-            <div id="your-edge-list" class="tag-list"></div>
-          </div>
-          <div class="card">
-            <h4 class="tag-section-title bad-title">🔴 Peer's Edge</h4>
-            <div id="peer-edge-list" class="tag-list"></div>
-          </div>
-        </div>
-
-        <!-- AI Narrative -->
-        <div class="card" id="compare-narrative-card" hidden>
-          <div class="card-header"><h3>Strategic Breakdown</h3></div>
-          <div id="compare-narrative" class="narrative"></div>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div id="compare-empty" class="empty-state">
-        <div class="empty-icon">⚔️</div>
-        <h3>No Comparison Data</h3>
-        <p>Enter competitor handles or choose a friend above and click <strong>Run Comparison</strong>.</p>
-      </div>
-    </section>
 
     <!-- ═══════ FRIENDS TAB ═══════ -->
     <section id="tab-friends" class="tab-panel">
+      <!-- Live Contest Radar & Standings -->
+      <div class="card contest-radar-card">
+        <div class="card-header">
+          <h3>📡 Contest Radar &amp; Live Standings</h3>
+          <span id="contest-status-pill" class="badge badge-info text-xs">Scanning...</span>
+        </div>
+        <div id="contest-radar-content">
+          <p class="empty-msg" style="padding: 6px 0;">Checking active Codeforces &amp; LeetCode rounds...</p>
+        </div>
+      </div>
+
       <!-- Add Friend Card -->
       <div class="card">
         <div class="card-header">

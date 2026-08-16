@@ -5,6 +5,26 @@
    ═══════════════════════════════════════════════════════════════ */
 
 const API_BASE = 'http://localhost:8000/api';
+const WEB_APP_BASE = 'http://localhost:5173';
+
+function openWebApp(tab = null) {
+  const cf = $('#cf-handle')?.value?.trim() || '';
+  const lc = $('#lc-handle')?.value?.trim() || '';
+  const currentTab = tab || state.activeTab || 'report';
+
+  const params = new URLSearchParams();
+  if (cf) params.append('cf', cf);
+  if (lc) params.append('lc', lc);
+  if (currentTab) params.append('tab', currentTab);
+
+  const url = `${WEB_APP_BASE}/?${params.toString()}`;
+
+  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+    chrome.tabs.create({ url });
+  } else {
+    window.open(url, '_blank');
+  }
+}
 
 /* ── Storage Abstraction (works outside extension context too) ── */
 const storage = {
@@ -44,7 +64,6 @@ let state = {
   reportData: null,
   planData: null,
   problemsData: null,
-  compareData: null,
   friends: [],
 };
 
@@ -131,7 +150,6 @@ function switchTab(tabId) {
     report: 'Generate Report',
     plan: 'Create Study Plan',
     problems: 'Find Problems',
-    compare: 'Run Comparison',
   };
   $('#run-btn-text').textContent = texts[tabId] || 'Run';
 }
@@ -149,7 +167,6 @@ async function handleRun() {
   if (tab === 'report') await runReport(cf, lc);
   else if (tab === 'plan') await runPlanGenerate();
   else if (tab === 'problems') await runProblems(cf, lc);
-  // Compare has its own button
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -366,7 +383,7 @@ async function handleApprovePlan() {
     state.planData = data;
     renderPlan(data);
     // Auto-save approved plan
-    await savePlan(cf, lc, data.plan);
+    await savePlan(cf, lc, data.plan, data.progress);
   } catch (err) {
     showToast(err.message || 'Failed to approve plan');
   } finally {
@@ -374,10 +391,21 @@ async function handleApprovePlan() {
   }
 }
 
+function getWeekStatus(wIdx, weeks, progress) {
+  const subtopics = weeks[wIdx]?.subtopics || [];
+  if (subtopics.length === 0) return 'not_started';
+  const doneCount = subtopics.filter(s => progress?.completedSubtopics?.[`w${wIdx}_${s}`]).length;
+  if (doneCount === 0) return 'not_started';
+  if (doneCount === subtopics.length) return 'completed';
+  return 'in_progress';
+}
+
 function renderPlan(data) {
   const plan = data?.plan || {};
   const weeks = plan?.weeks || [];
   const isApproved = plan?.status === 'approved';
+  const progress = data?.progress || state.planProgress || { completedSubtopics: {}, reattempt: {}, notes: {} };
+  state.planProgress = progress;
 
   // Banner
   if (weeks.length > 0) {
@@ -386,7 +414,7 @@ function renderPlan(data) {
     $('#plan-status-icon').textContent = isApproved ? '✓' : '✦';
     const text = $('#plan-status-text');
     text.innerHTML = isApproved
-      ? '<strong>Plan Approved & Locked In!</strong><br><span style="font-size:11px;opacity:0.8;">Resources and milestones finalized.</span>'
+      ? '<strong>Plan Approved & Locked In!</strong><br><span style="font-size:11px;opacity:0.8;">Check off subtopics & flag sections to re-attempt later.</span>'
       : '<strong>Draft Ready for Review</strong><br><span style="font-size:11px;opacity:0.8;">Review the weekly plan below. Revise or approve.</span>';
     const pill = $('#plan-status-badge');
     pill.textContent = plan.status || 'draft';
@@ -399,9 +427,20 @@ function renderPlan(data) {
   if (weeks.length > 0) {
     const grid = $('#plan-weeks-grid');
     grid.innerHTML = weeks.map((w, i) => {
-      const subtopics = (w.subtopics || []).map(s =>
-        `<span class="subtopic-chip">${escHtml(s)}</span>`
-      ).join('');
+      const currentStatus = getWeekStatus(i, weeks, progress);
+      const isReattempt = !!progress.reattempt?.[i];
+      const statusLabel = currentStatus === 'completed' ? '🟢 Completed' : currentStatus === 'in_progress' ? '🟡 In Progress' : '⚪ Not Started';
+
+      const subtopics = (w.subtopics || []).map(s => {
+        const key = `w${i}_${s}`;
+        const checked = !!progress.completedSubtopics?.[key];
+        return `
+          <button type="button" class="subtopic-chip-interactive ${checked ? 'checked' : ''}" data-subtopic-toggle="${escHtml(key)}" data-week-idx="${i}" data-subtopic-name="${escHtml(s)}">
+            <span class="subtopic-checkbox">${checked ? '✓' : ''}</span>
+            <span class="subtopic-text">${escHtml(s)}</span>
+          </button>
+        `;
+      }).join('');
 
       const resources = (w.resources || []).map(r =>
         `<a class="resource-link" href="${escHtml(r.url)}" target="_blank" rel="noopener">
@@ -411,11 +450,20 @@ function renderPlan(data) {
       ).join('');
 
       return `
-        <div class="week-card">
-          <span class="week-badge">Week ${w.week || i + 1}</span>
-          <span class="week-meta">${w.problems_per_day || 3} problems/day</span>
+        <div class="week-card ${currentStatus === 'completed' ? 'card-completed' : ''} ${isReattempt ? 'card-reattempt' : ''}">
+          <div class="week-card-header">
+            <div class="week-header-left">
+              <span class="week-badge">Week ${w.week || i + 1}</span>
+              <span class="week-status-badge status-${currentStatus}">${statusLabel}</span>
+              <button type="button" class="reattempt-btn ${isReattempt ? 'active' : ''}" data-reattempt-week="${i}" title="${isReattempt ? 'Flagged to re-attempt later (Click to unflag)' : 'Flag this section to re-attempt later'}">
+                <span class="flag-icon">${isReattempt ? '🚩' : '⚐'}</span>
+                <span>${isReattempt ? 'Re-attempt Flagged' : 'Re-attempt Later'}</span>
+              </button>
+            </div>
+            <span class="week-meta">${w.problems_per_day || 3} probs/day</span>
+          </div>
           <div class="week-topic">${escHtml(w.topic || 'Topic')}</div>
-          ${subtopics ? `<div class="subtopic-chips">${subtopics}</div>` : ''}
+          ${subtopics ? `<div class="subtopic-chips-interactive">${subtopics}</div>` : ''}
           ${resources ? `<div class="resource-list">${resources}</div>` : ''}
         </div>
       `;
@@ -431,12 +479,55 @@ function renderPlan(data) {
   }
 }
 
+async function handleToggleSubtopic(key) {
+  if (!state.planData?.plan) return;
+  const progress = state.planProgress || { completedSubtopics: {}, reattempt: {}, notes: {} };
+  const current = !progress.completedSubtopics?.[key];
+  progress.completedSubtopics = {
+    ...progress.completedSubtopics,
+    [key]: current
+  };
+  state.planProgress = progress;
+  state.planData.progress = progress;
+
+  const cf = $('#cf-handle')?.value?.trim() || '';
+  const lc = $('#lc-handle')?.value?.trim() || '';
+  if (cf || lc) {
+    await savePlan(cf, lc, state.planData.plan, progress);
+    apiPost('/plan/progress', { key: `plan_${cf}_${lc}`, progress }).catch(() => {});
+  }
+
+  renderPlan(state.planData);
+}
+
+async function handleToggleReattempt(wIdx) {
+  if (!state.planData?.plan) return;
+  const progress = state.planProgress || { completedSubtopics: {}, reattempt: {}, notes: {} };
+  progress.reattempt = {
+    ...progress.reattempt,
+    [wIdx]: !progress.reattempt?.[wIdx]
+  };
+  state.planProgress = progress;
+  state.planData.progress = progress;
+
+  const cf = $('#cf-handle')?.value?.trim() || '';
+  const lc = $('#lc-handle')?.value?.trim() || '';
+  if (cf || lc) {
+    await savePlan(cf, lc, state.planData.plan, progress);
+    apiPost('/plan/progress', { key: `plan_${cf}_${lc}`, progress }).catch(() => {});
+  }
+
+  renderPlan(state.planData);
+}
+
 /* ── Plan Persistence (chrome.storage.local) ─────────────────── */
 
-async function savePlan(cf, lc, plan) {
+async function savePlan(cf, lc, plan, progress = null) {
   const key = `plan_${cf}_${lc}`;
+  const prog = progress || state.planProgress || { completedSubtopics: {}, reattempt: {}, notes: {} };
   const entry = {
     cf, lc, plan,
+    progress: prog,
     savedAt: new Date().toISOString(),
     label: `${cf || '?'}/${lc || '?'} — ${(plan.weeks || []).length} weeks`,
   };
@@ -462,8 +553,10 @@ async function loadSavedPlan(key) {
   const entry = plans[key];
   if (!entry) return;
 
-  state.planData = { plan: entry.plan };
-  renderPlan({ plan: entry.plan });
+  const prog = entry.progress || { completedSubtopics: {}, reattempt: {}, notes: {} };
+  state.planProgress = prog;
+  state.planData = { plan: entry.plan, progress: prog };
+  renderPlan({ plan: entry.plan, progress: prog });
 }
 
 async function loadSavedPlansList() {
@@ -599,112 +692,7 @@ function renderProblemCards(problems) {
   }).join('');
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   COMPARE TAB
-   ═══════════════════════════════════════════════════════════════ */
-
-async function runCompare() {
-  const cf = $('#cf-handle').value.trim();
-  const lc = $('#lc-handle').value.trim();
-  const peerCf = $('#peer-cf').value.trim();
-  const peerLc = $('#peer-lc').value.trim();
-
-  if (!cf && !lc) { showToast('Enter your handles in the top bar first.'); return; }
-  if (!peerCf && !peerLc) { showToast("Enter competitor's handle."); return; }
-
-  hide($('#compare-empty'));
-  hide($('#compare-content'));
-  show($('#compare-loading'));
-  setBtnLoading('#compare-run-btn', true);
-
-  try {
-    const data = await apiPost('/compare', {
-      cf_username: cf, lc_username: lc,
-      peer_cf: peerCf, peer_lc: peerLc,
-    });
-    state.compareData = data;
-    renderCompare(data, cf, peerCf);
-  } catch (err) {
-    showToast(err.message || 'Failed to compare');
-    show($('#compare-empty'));
-  } finally {
-    hide($('#compare-loading'));
-    setBtnLoading('#compare-run-btn', false);
-  }
-}
-
-function renderCompare(data, cfHandle, peerCfHandle) {
-  const cmp = data?.comparison || {};
-  const youCf = cmp?.you?.cf || {};
-  const youLc = cmp?.you?.lc || {};
-  const peerCfStats = cmp?.peer?.cf || {};
-  const peerLcStats = cmp?.peer?.lc || {};
-  const diff = cmp?.diff || {};
-  const yourHandle = cmp?.your_handle || cfHandle || 'You';
-  const peerHandle = cmp?.peer_handle || peerCfHandle || 'Peer';
-
-  // You card
-  const youCard = $('#compare-you');
-  youCard.innerHTML = `
-    <div class="compare-handle">
-      <span class="compare-name">${escHtml(yourHandle)}</span>
-      <span class="compare-role role-primary">YOU</span>
-    </div>
-    <div class="compare-stats">
-      <div class="compare-stat"><div class="stat-label">CF Rating</div><div class="stat-val" style="color:#60a5fa">${youCf.cf_rating || '—'}</div>${deltaHtml(diff.cf_rating)}</div>
-      <div class="compare-stat"><div class="stat-label">CF Peak</div><div class="stat-val" style="color:#818cf8">${youCf.cf_max_rating || '—'}</div>${deltaHtml(diff.cf_max_rating)}</div>
-      <div class="compare-stat"><div class="stat-label">LC Solved</div><div class="stat-val" style="color:#fbbf24">${youLc.lc_solved || 0}</div>${deltaHtml(diff.lc_solved)}</div>
-    </div>
-  `;
-
-  // Peer card
-  const peerCard = $('#compare-peer');
-  peerCard.innerHTML = `
-    <div class="compare-handle">
-      <span class="compare-name">${escHtml(peerHandle)}</span>
-      <span class="compare-role role-rival">RIVAL</span>
-    </div>
-    <div class="compare-stats">
-      <div class="compare-stat"><div class="stat-label">CF Rating</div><div class="stat-val" style="color:#f87171">${peerCfStats.cf_rating || '—'}</div><div class="stat-delta delta-tied">Benchmark</div></div>
-      <div class="compare-stat"><div class="stat-label">CF Peak</div><div class="stat-val" style="color:#fb7185">${peerCfStats.cf_max_rating || '—'}</div><div class="stat-delta delta-tied">Benchmark</div></div>
-      <div class="compare-stat"><div class="stat-label">LC Solved</div><div class="stat-val" style="color:#fbbf24">${peerLcStats.lc_solved || 0}</div><div class="stat-delta delta-tied">Benchmark</div></div>
-    </div>
-  `;
-
-  // Chart
-  const youHist = data?.you?.cf_data?.contest_history || [];
-  const peerHist = data?.peer?.cf_data?.contest_history || [];
-  const canvas = $('#compare-chart');
-  if (youHist.length > 0 || peerHist.length > 0) {
-    drawDualLineChart(canvas,
-      youHist.map(c => c.newRating),
-      peerHist.map(c => c.newRating),
-      '#ff4757', '#4a5568'
-    );
-  }
-
-
-  // Tag breakdown
-  renderTagList('#common-weak-list', cmp.common_weak || [], t =>
-    `You: <strong style="color:#f87171">${t.your_rate}%</strong> · Peer: <strong style="color:#f87171">${t.peer_rate}%</strong>`
-  );
-  renderTagList('#your-edge-list', cmp.your_edge || [], t =>
-    `<span style="color:#34d399;font-weight:700">+${t.advantage}pp</span> accuracy advantage`
-  );
-  renderTagList('#peer-edge-list', cmp.peer_edge || [], t =>
-    `Peer <span style="color:#f87171;font-weight:700">+${t.advantage}pp</span> lead`
-  );
-
-  // Narrative
-  if (cmp.narrative) {
-    $('#compare-narrative').textContent = cmp.narrative;
-    show($('#compare-narrative-card'));
-  } else {
-    hide($('#compare-narrative-card'));
-  }
-
-  show($('#compare-content'));
-}
+/* (Compare tab removed — peer duel is launched inline from Friends tab) */
 
 function deltaHtml(val) {
   if (val == null) return '';
@@ -909,7 +897,6 @@ function setRunBtnLoading(loading) {
       report: 'Generate Report',
       plan: 'Create Study Plan',
       problems: 'Find Problems',
-      compare: 'Run Comparison',
     };
     text.textContent = texts[state.activeTab] || 'Run';
     hide(spin);
@@ -958,8 +945,101 @@ async function loadFriendsList() {
   }
   state.friends = friends;
   renderFriendsList();
-  renderCompareFriendsQuickbar();
+
   updateFriendsBadge();
+  loadContestsInfoForExtension();
+}
+
+let liveContestsState = { live: [], upcoming: [], live_standings: {} };
+
+async function loadContestsInfoForExtension() {
+  const radarContent = $('#contest-radar-content');
+  const statusPill = $('#contest-status-pill');
+  if (!radarContent) return;
+
+  try {
+    const handles = (state.friends || []).map(f => f.cf).filter(Boolean).join(',');
+    const data = await apiGet(`/contests?handles=${encodeURIComponent(handles)}`);
+    if (data) {
+      liveContestsState = data;
+      renderContestRadar();
+      renderFriendsList();
+    }
+  } catch (err) {
+    if (statusPill) statusPill.textContent = 'Standby';
+  }
+}
+
+function renderContestRadar() {
+  const radarContent = $('#contest-radar-content');
+  const statusPill = $('#contest-status-pill');
+  if (!radarContent) return;
+
+  const live = liveContestsState.live || [];
+  const upcoming = liveContestsState.upcoming || [];
+
+  if (live.length > 0) {
+    if (statusPill) {
+      statusPill.textContent = '● LIVE NOW';
+      statusPill.style.background = '#10b981';
+      statusPill.style.color = '#ffffff';
+    }
+    radarContent.innerHTML = live.map(c => `
+      <div class="contest-live-item" style="padding: 6px 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; margin-bottom: 6px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong style="color: #059669; font-size: 11px;">🔴 ${escHtml(c.platform)}: ${escHtml(c.name)}</strong>
+          <a href="${c.url}" target="_blank" style="color: #ff4757; font-size: 10px; font-weight: bold;">Open ↗</a>
+        </div>
+        ${renderLiveFriendStandings(c.id)}
+      </div>
+    `).join('');
+  } else {
+    if (statusPill) {
+      statusPill.textContent = 'Upcoming';
+      statusPill.style.background = '#d8e0ea';
+      statusPill.style.color = '#2d3436';
+    }
+    if (upcoming.length > 0) {
+      const top2 = upcoming.slice(0, 2);
+      radarContent.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          ${top2.map(uc => {
+            const hoursAway = uc.startTimeSeconds ? Math.round((uc.startTimeSeconds - Date.now() / 1000) / 3600) : null;
+            return `
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size: 11px; padding: 4px 8px; background: #f0f2f5; border-radius: 4px;">
+                <span style="font-weight:600; color:#2d3436;">[${escHtml(uc.platform)}] ${escHtml(uc.name)}</span>
+                <span style="color:#ff4757; font-weight:bold; font-size:10px;">${hoursAway && hoursAway > 0 ? `in ~${hoursAway}h` : 'Upcoming'}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } else {
+      radarContent.innerHTML = '<p class="empty-msg" style="padding:4px 0;">No active or scheduled contests currently detected.</p>';
+    }
+  }
+}
+
+function renderLiveFriendStandings(contestId) {
+  const standingsMap = liveContestsState.live_standings || {};
+  const activeFriends = (state.friends || []).filter(f => f.cf && standingsMap[f.cf.toLowerCase()]);
+
+  if (activeFriends.length === 0) {
+    return '<div style="font-size: 10px; color: #4a5568; margin-top: 3px;">No tracked friends in active round.</div>';
+  }
+
+  return `
+    <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+      ${activeFriends.map(f => {
+        const st = standingsMap[f.cf.toLowerCase()];
+        return `
+          <div style="padding: 2px 6px; background: #ffffff; border: 1px solid #10b981; border-radius: 4px; font-size: 10px; font-weight: bold; color: #065f46;">
+            ${escHtml(f.name || f.cf)}: Rank #${st.rank} (${st.points} pts)
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function updateFriendsBadge() {
@@ -976,12 +1056,18 @@ function renderFriendsList() {
     return;
   }
 
+  const standingsMap = liveContestsState.live_standings || {};
+
   container.innerHTML = state.friends.map(f => {
     const cfDisplay = f.cf ? `@${f.cf}` : '—';
     const lcDisplay = f.lc ? `@${f.lc}` : '—';
     const cfRatingDisplay = f.cfRating ? f.cfRating : '—';
-    const lcRatingDisplay = f.lcRating ? f.lcRating : (f.lcSolved ? `${f.lcSolved} solved` : '—');
+    const lcRatingDisplay = f.lcRating ? f.lcRating : '—';
+    const cfTotalSolved = f.cfSolved ?? 0;
+    const lcTotalSolved = f.lcSolved ?? 0;
+    const totalSolvedCombined = (Number(cfTotalSolved) || 0) + (Number(lcTotalSolved) || 0);
     const initial = (f.name || f.cf || f.lc || 'F').charAt(0).toUpperCase();
+    const liveStanding = f.cf ? standingsMap[f.cf.toLowerCase()] : null;
 
     return `
       <div class="friend-card" data-friend-id="${f.id}">
@@ -1010,6 +1096,19 @@ function renderFriendsList() {
           </div>
         </div>
 
+        <!-- Hover Total Questions Solved (NO easy/medium/hard bifurcation) -->
+        <div class="friend-hover-questions" title="Total Problems Solved Across Both Platforms: ${totalSolvedCombined}">
+          <span class="hover-icon">📊</span>
+          <span class="hover-text">Total: <strong>${totalSolvedCombined}</strong> (CF: ${cfTotalSolved} · LC: ${lcTotalSolved})</span>
+        </div>
+
+        ${liveStanding ? `
+          <div style="grid-column: 1 / -1; padding: 3px 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 4px; font-size: 10px; font-weight: bold; color: #065f46; display: flex; justify-content: space-between;">
+            <span>⚡ Live in ${escHtml(liveStanding.contest_name || 'Contest')}:</span>
+            <span>Rank #${liveStanding.rank}</span>
+          </div>
+        ` : ''}
+
         <div class="friend-actions">
           <button class="btn-primary btn-duel" data-duel-friend="${f.id}" title="Launch Peer Duel" type="button">
             <span>⚔️ Duel</span>
@@ -1026,24 +1125,7 @@ function renderFriendsList() {
   }).join('');
 }
 
-function renderCompareFriendsQuickbar() {
-  const quickbar = $('#compare-friends-quickbar');
-  const chipsContainer = $('#compare-friends-chips');
-  if (!quickbar || !chipsContainer) return;
 
-  if (!state.friends || state.friends.length === 0) {
-    hide(quickbar);
-    return;
-  }
-
-  show(quickbar);
-  chipsContainer.innerHTML = state.friends.map(f => `
-    <button class="friend-duel-chip" data-duel-chip="${f.id}" type="button">
-      <span>⚔️ ${escHtml(f.name || f.cf || f.lc)}</span>
-      <span class="chip-rating">${f.cfRating || f.lcRating || ''}</span>
-    </button>
-  `).join('');
-}
 
 async function handleAddFriend() {
   const nameInput = $('#friend-name');
@@ -1092,7 +1174,7 @@ async function handleAddFriend() {
   await storage.set({ upsolver_friends: updated });
   state.friends = updated;
   renderFriendsList();
-  renderCompareFriendsQuickbar();
+
   updateFriendsBadge();
 
   nameInput.value = '';
@@ -1107,7 +1189,7 @@ async function handleDeleteFriend(id) {
   await storage.set({ upsolver_friends: updated });
   state.friends = updated;
   renderFriendsList();
-  renderCompareFriendsQuickbar();
+
   updateFriendsBadge();
   showToast('Friend removed from roster.');
 }
@@ -1131,7 +1213,7 @@ async function handleRefreshFriend(id) {
       f.lastUpdated = Date.now();
       await storage.set({ upsolver_friends: state.friends });
       renderFriendsList();
-      renderCompareFriendsQuickbar();
+    
       showToast(`Updated ratings for ${f.name}!`);
     }
   } catch (err) {
@@ -1159,59 +1241,11 @@ async function handleRefreshAllFriends() {
   }
   await storage.set({ upsolver_friends: state.friends });
   renderFriendsList();
-  renderCompareFriendsQuickbar();
+
   showToast('All friend ratings refreshed!');
 }
 
-function launchPeerDuel(friend) {
-  if (!friend) return;
-  
-  // Set peer inputs
-  if (friend.cf) $('#peer-cf').value = friend.cf;
-  if (friend.lc) $('#peer-lc').value = friend.lc;
 
-  // Switch to compare tab
-  switchTab('compare');
-
-  // Trigger comparison immediately
-  showToast(`⚔️ Launching Peer Duel vs ${friend.name || friend.cf || 'Rival'}...`);
-  runCompare();
-}
-
-async function saveCurrentCompetitorAsFriend() {
-  const cf = $('#peer-cf').value.trim();
-  const lc = $('#peer-lc').value.trim();
-  if (!cf && !lc) {
-    showToast('Enter a competitor handle first.');
-    return;
-  }
-
-  const existing = state.friends.find(f => (cf && f.cf === cf) || (lc && f.lc === lc));
-  if (existing) {
-    showToast(`${existing.name} is already in your friends roster!`);
-    return;
-  }
-
-  const newFriend = {
-    id: 'f_' + Date.now(),
-    name: cf || lc || 'Competitor',
-    cf: cf,
-    lc: lc,
-    cfRating: null,
-    cfRank: null,
-    lcRating: null,
-    lcSolved: null,
-    lastUpdated: Date.now()
-  };
-
-  const updated = [newFriend, ...state.friends];
-  await storage.set({ upsolver_friends: updated });
-  state.friends = updated;
-  renderFriendsList();
-  renderCompareFriendsQuickbar();
-  updateFriendsBadge();
-  showToast(`Saved ${newFriend.name} to your friends roster!`);
-}
 
 /* ═══════════════════════════════════════════════════════════════
    EVENT LISTENERS (no inline handlers — MV3 compliant)
@@ -1225,6 +1259,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $$('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
+
+  // Launch full web dashboard buttons
+  $('#open-site-btn')?.addEventListener('click', () => openWebApp(state.activeTab));
+  $('#open-plan-site-btn')?.addEventListener('click', () => openWebApp('plan'));
 
   // Run button
   $('#run-btn').addEventListener('click', handleRun);
@@ -1267,36 +1305,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     runProblems(cf, lc);
   });
 
-  // Compare tab
-  $('#compare-run-btn').addEventListener('click', runCompare);
-  $('#save-competitor-btn')?.addEventListener('click', saveCurrentCompetitorAsFriend);
-
   // Friends tab events
   $('#add-friend-btn')?.addEventListener('click', handleAddFriend);
   $('#refresh-all-friends-btn')?.addEventListener('click', handleRefreshAllFriends);
 
-  // Delegated events for Friends list (Duel / Refresh / Delete)
+  // Delegated events for Friends list (Refresh / Delete)
   $('#friends-list')?.addEventListener('click', async (e) => {
-    const duelBtn = e.target.closest('[data-duel-friend]');
     const refreshBtn = e.target.closest('[data-refresh-friend]');
     const deleteBtn = e.target.closest('[data-delete-friend]');
 
-    if (duelBtn) {
-      const friend = state.friends.find(f => f.id === duelBtn.dataset.duelFriend);
-      if (friend) launchPeerDuel(friend);
-    } else if (refreshBtn) {
+    if (refreshBtn) {
       await handleRefreshFriend(refreshBtn.dataset.refreshFriend);
     } else if (deleteBtn) {
       await handleDeleteFriend(deleteBtn.dataset.deleteFriend);
-    }
-  });
-
-  // Delegated events for Compare tab quick-duel chips
-  $('#compare-friends-chips')?.addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-duel-chip]');
-    if (chip) {
-      const friend = state.friends.find(f => f.id === chip.dataset.duelChip);
-      if (friend) launchPeerDuel(friend);
     }
   });
 
@@ -1312,6 +1333,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const delBtn = e.target.closest('[data-delete-plan]');
     if (loadBtn) await loadSavedPlan(loadBtn.dataset.loadPlan);
     if (delBtn) await deleteSavedPlan(delBtn.dataset.deletePlan);
+  });
+
+  // Delegated events for plan weeks (subtopic toggle & re-attempt toggle)
+  $('#plan-weeks-grid')?.addEventListener('click', async (e) => {
+    const subtopicBtn = e.target.closest('[data-subtopic-toggle]');
+    const reattemptBtn = e.target.closest('[data-reattempt-week]');
+
+    if (subtopicBtn) {
+      const key = subtopicBtn.dataset.subtopicToggle;
+      await handleToggleSubtopic(key);
+    } else if (reattemptBtn) {
+      const wIdx = parseInt(reattemptBtn.dataset.reattemptWeek, 10);
+      await handleToggleReattempt(wIdx);
+    }
   });
 
   // Delegated events for weak topic chips
