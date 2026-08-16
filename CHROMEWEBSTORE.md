@@ -78,8 +78,11 @@ When prompted for permission justifications in the Developer Dashboard, paste th
 ### `storage`
 > **Justification:** "Used to locally store user profile handles, cached audit reports, active study plan progress (completed subtopics and re-attempt flags), and friends roster so users don't need to re-enter them on every launch."
 
-### `host_permissions` (`http://localhost:*/*`, `http://127.0.0.1:*/*`, `https://*/*`)
-> **Justification:** "Required to communicate with the Upsolver backend API server (whether hosted locally or on a remote cloud endpoint) to fetch Codeforces/LeetCode user metrics, contest standings, and AI-generated study plans."
+### `host_permissions` (`http://localhost:*/*`, `http://127.0.0.1:*/*`, `https://codeforces.com/*`, `https://leetcode.com/*`)
+> **Justification:** "Required to communicate with the local Upsolver API server and fetch contest/profile statistics directly from Codeforces and LeetCode endpoints."
+
+### `optional_host_permissions` (`https://*/*`)
+> **Justification:** "Allows users to optionally configure and connect the extension to their own self-hosted cloud backend without requiring broad permissions at initial install time."
 
 ---
 

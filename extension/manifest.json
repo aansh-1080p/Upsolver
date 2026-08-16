@@ -25,6 +25,10 @@
   "host_permissions": [
     "http://localhost:*/*",
     "http://127.0.0.1:*/*",
+    "https://codeforces.com/*",
+    "https://leetcode.com/*"
+  ],
+  "optional_host_permissions": [
     "https://*/*"
   ],
   "background": {
