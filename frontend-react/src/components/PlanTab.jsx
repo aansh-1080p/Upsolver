@@ -731,18 +731,22 @@ export default function PlanTab({
                 <div
                   key={idx}
                   className={`industrial-card corner-screws p-5 flex flex-col justify-between transition-all ${
-                    isWeekDone
+                    isReattempt
+                      ? 'bg-[#f38a93] border border-[#f0717c] text-white shadow-[0_6px_20px_rgba(243,138,147,0.4)]'
+                      : isWeekDone
                       ? 'border-[#10b981]/50 bg-[#f4fdf8]'
-                      : isReattempt
-                      ? 'border-[#fda4af]/60 bg-[#fff5f5]'
                       : ''
                   }`}
                 >
                   <div className="space-y-3.5">
                     {/* Header */}
-                    <div className="flex items-center justify-between pb-2 border-b border-[#babecc]/50">
+                    <div className={`flex items-center justify-between pb-2 border-b ${isReattempt ? 'border-white/30' : 'border-[#babecc]/50'}`}>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-2.5 py-1 bg-[#d8e0ea] text-[#2d3436] rounded-md text-xs font-bold font-mono shadow-[inset_1px_1px_2px_#babecc]">
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono ${
+                          isReattempt
+                            ? 'bg-white/20 text-white shadow-none'
+                            : 'bg-[#d8e0ea] text-[#2d3436] shadow-[inset_1px_1px_2px_#babecc]'
+                        }`}>
                           WEEK {String(w.week || idx + 1).padStart(2, '0')}
                         </span>
 
@@ -750,7 +754,9 @@ export default function PlanTab({
                         {isApproved && (
                           <span
                             className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border select-none ${
-                              currentStatus === 'completed'
+                              isReattempt
+                                ? 'bg-white/25 text-white border-white/40'
+                                : currentStatus === 'completed'
                                 ? 'bg-[#d1fae5] text-[#065f46] border-[#10b981]'
                                 : currentStatus === 'in_progress'
                                 ? 'bg-[#fef3c7] text-[#92400e] border-[#f59e0b]'
@@ -769,23 +775,23 @@ export default function PlanTab({
                             title={isReattempt ? 'Flagged to re-attempt later (Click to unflag)' : 'Flag this section to re-attempt later'}
                             className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border transition-all flex items-center gap-1.5 cursor-pointer ${
                               isReattempt
-                                ? 'bg-[#fff1f2] text-[#e11d48] border-[#fda4af] shadow-[inset_1px_1px_2px_#fecdd3]'
+                                ? 'bg-white text-[#f38a93] border-white shadow-md'
                                 : 'bg-[#f0f2f5] text-[#64748b] border-[#cbd5e1] hover:text-[#0f172a] hover:bg-[#ffffff] shadow-[1px_1px_2px_#babecc]'
                             }`}
                           >
-                            <Flag className={`h-3 w-3 ${isReattempt ? 'fill-[#e11d48] text-[#e11d48]' : 'text-[#94a3b8]'}`} />
+                            <Flag className={`h-3 w-3 ${isReattempt ? 'fill-[#f38a93] text-[#f38a93]' : 'text-[#94a3b8]'}`} />
                             <span>{isReattempt ? 'Re-attempt Flagged' : 'Re-attempt Later'}</span>
                           </button>
                         )}
                       </div>
 
-                      <span className="text-xs font-bold font-mono text-[#4a5568]">
+                      <span className={`text-xs font-bold font-mono ${isReattempt ? 'text-white/90' : 'text-[#4a5568]'}`}>
                         Target: {w.problems_per_day || 3} probs / day
                       </span>
                     </div>
 
                     {/* Topic Title */}
-                    <h4 className="text-sm font-bold text-[#2d3436] text-embossed">
+                    <h4 className={`text-sm font-bold text-embossed ${isReattempt ? 'text-white' : 'text-[#2d3436]'}`}>
                       {w.topic || 'Algorithmic Topic'}
                     </h4>
 
@@ -793,10 +799,10 @@ export default function PlanTab({
                     {subtopics.length > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[11px] font-bold text-[#4a5568] uppercase font-mono">
+                          <p className={`text-[11px] font-bold uppercase font-mono ${isReattempt ? 'text-white/90' : 'text-[#4a5568]'}`}>
                             Subtopic Mastery Checklist:
                           </p>
-                          <span className="text-[10px] font-mono text-[#6b7280]">
+                          <span className={`text-[10px] font-mono ${isReattempt ? 'text-white/80' : 'text-[#6b7280]'}`}>
                             {subtopics.filter((s) => progress.completedSubtopics?.[`w${wIdx}_${s}`]).length} / {subtopics.length} done
                           </span>
                         </div>
@@ -809,18 +815,26 @@ export default function PlanTab({
                                 key={sIdx}
                                 onClick={() => isApproved && toggleSubtopic(wIdx, s)}
                                 className={`flex items-center gap-2.5 p-2 rounded-lg transition-all ${
-                                  isApproved ? 'cursor-pointer hover:bg-[#ffffff]' : ''
+                                  isApproved ? 'cursor-pointer' : ''
                                 } ${
-                                  isChecked
+                                  isReattempt
+                                    ? isChecked
+                                      ? 'bg-white/25 text-white/90'
+                                      : 'bg-white/15 text-white hover:bg-white/25'
+                                    : isChecked
                                     ? 'bg-[#d8e0ea] text-[#065f46] shadow-[inset_1.5px_1.5px_3px_#babecc]'
-                                    : 'bg-[#f0f2f5] text-[#2d3436] shadow-[2px_2px_4px_#babecc,-2px_-2px_4px_#ffffff]'
+                                    : 'bg-[#f0f2f5] text-[#2d3436] shadow-[2px_2px_4px_#babecc,-2px_-2px_4px_#ffffff] hover:bg-[#ffffff]'
                                 }`}
                               >
                                 {isApproved ? (
                                   <button
                                     type="button"
                                     className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                                      isChecked
+                                      isReattempt
+                                        ? isChecked
+                                          ? 'bg-white text-[#f38a93] shadow-sm'
+                                          : 'border border-white/70 bg-white/10 text-white'
+                                        : isChecked
                                         ? 'bg-[#10b981] text-white shadow-sm'
                                         : 'border border-[#a3b1c6] bg-white'
                                     }`}
@@ -828,7 +842,7 @@ export default function PlanTab({
                                     {isChecked ? <Check className="h-3 w-3" /> : null}
                                   </button>
                                 ) : (
-                                  <Circle className="h-3.5 w-3.5 text-[#a3b1c6]" />
+                                  <Circle className={`h-3.5 w-3.5 ${isReattempt ? 'text-white/70' : 'text-[#a3b1c6]'}`} />
                                 )}
                                 <span className={`text-xs font-mono select-none ${isChecked ? 'line-through opacity-75 font-semibold' : 'font-medium'}`}>
                                   {s}
@@ -842,8 +856,8 @@ export default function PlanTab({
 
                     {/* Resources */}
                     {(w.resources || []).length > 0 && (
-                      <div className="pt-2 border-t border-[#babecc]/30">
-                        <p className="text-[11px] font-bold text-[#4a5568] uppercase font-mono mb-1.5">
+                      <div className={`pt-2 border-t ${isReattempt ? 'border-white/30' : 'border-[#babecc]/30'}`}>
+                        <p className={`text-[11px] font-bold uppercase font-mono mb-1.5 ${isReattempt ? 'text-white/90' : 'text-[#4a5568]'}`}>
                           Verified Resources & Practice Sets:
                         </p>
                         <div className="space-y-1.5">
@@ -853,10 +867,14 @@ export default function PlanTab({
                               href={r.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center justify-between p-2 rounded-lg bg-[#f0f2f5] hover:bg-[#ffffff] text-xs text-[#2d3436] hover:text-[#ff4757] shadow-[2px_2px_5px_#babecc,-2px_-2px_5px_#ffffff] transition-all group"
+                              className={`flex items-center justify-between p-2 rounded-lg text-xs transition-all group ${
+                                isReattempt
+                                  ? 'bg-white/15 hover:bg-white/25 text-white'
+                                  : 'bg-[#f0f2f5] hover:bg-[#ffffff] text-[#2d3436] hover:text-[#ff4757] shadow-[2px_2px_5px_#babecc,-2px_-2px_5px_#ffffff]'
+                              }`}
                             >
                               <span className="truncate pr-2 font-medium">{r.name || 'Practice Resource'}</span>
-                              <ExternalLink className="h-3 w-3 text-[#a3b1c6] group-hover:text-[#ff4757] flex-shrink-0" />
+                              <ExternalLink className={`h-3 w-3 flex-shrink-0 ${isReattempt ? 'text-white/80 group-hover:text-white' : 'text-[#a3b1c6] group-hover:text-[#ff4757]'}`} />
                             </a>
                           ))}
                         </div>
@@ -865,9 +883,9 @@ export default function PlanTab({
 
                     {/* Week Notes */}
                     {isApproved && (
-                      <div className="pt-2 border-t border-[#babecc]/30">
-                        <div className="flex items-center gap-1 text-[11px] font-bold text-[#4a5568] uppercase font-mono mb-1">
-                          <Edit3 className="h-3 w-3 text-[#ff4757]" />
+                      <div className={`pt-2 border-t ${isReattempt ? 'border-white/30' : 'border-[#babecc]/30'}`}>
+                        <div className={`flex items-center gap-1 text-[11px] font-bold uppercase font-mono mb-1 ${isReattempt ? 'text-white/90' : 'text-[#4a5568]'}`}>
+                          <Edit3 className={`h-3 w-3 ${isReattempt ? 'text-white' : 'text-[#ff4757]'}`} />
                           <span>Notes & Scratchpad:</span>
                         </div>
                         <textarea
@@ -875,7 +893,11 @@ export default function PlanTab({
                           value={progress.notes?.[wIdx] || ''}
                           onChange={(e) => setWeekNotes(wIdx, e.target.value)}
                           placeholder="Log breakthroughs, tricky bugs, or topics to revisit..."
-                          className="input-industrial w-full py-1.5 px-2.5 text-xs font-sans resize-none"
+                          className={`w-full py-1.5 px-2.5 text-xs font-sans resize-none rounded-lg transition-all ${
+                            isReattempt
+                              ? 'bg-white/20 text-white placeholder-white/60 border border-white/30 focus:bg-white/25 focus:outline-none focus:ring-1 focus:ring-white'
+                              : 'input-industrial'
+                          }`}
                         />
                       </div>
                     )}

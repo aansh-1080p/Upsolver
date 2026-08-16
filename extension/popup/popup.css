@@ -664,8 +664,46 @@ body {
 }
 
 .week-card.card-reattempt {
-  border-color: rgba(253, 164, 175, 0.6);
-  background: #fff5f5;
+  border-color: #f0717c;
+  background: #f38a93;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(243, 138, 147, 0.4);
+}
+
+.week-card.card-reattempt .week-topic-title {
+  color: #ffffff;
+}
+
+.week-card.card-reattempt .week-target,
+.week-card.card-reattempt .subtopic-header {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.week-card.card-reattempt .week-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.week-card.card-reattempt .subtopic-chip {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.week-card.card-reattempt .subtopic-chip:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.week-card.card-reattempt .subtopic-chip.done {
+  background: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.week-card.card-reattempt .reattempt-btn.active {
+  background: #ffffff;
+  color: #f38a93;
+  border-color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .week-card-header {
