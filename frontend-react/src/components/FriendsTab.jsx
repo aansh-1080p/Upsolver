@@ -315,21 +315,21 @@ export default function FriendsTab({ cfHandle = '', lcHandle = '', onCompare }) 
     <div className="space-y-6">
       {/* Empty Handle Warning Banner */}
       {handleWarning && (
-        <div className="industrial-panel p-4 border border-[#ff4856] bg-[#fff1f2] text-[#2d3436] flex items-start justify-between gap-3 shadow-[4px_4px_10px_#babecc]">
-          <div className="flex items-start gap-2.5">
-            <AlertTriangle className="h-5 w-5 text-[#ff4856] flex-shrink-0 mt-0.5" />
+        <div className="p-4 rounded-xl bg-[#ff4856] text-white flex items-start justify-between gap-3 shadow-[4px_4px_14px_rgba(255,72,86,0.35)] border border-[#ff6b7b]">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-bold font-mono uppercase tracking-wider text-[#ff4856]">
+              <p className="text-xs font-black font-mono uppercase tracking-wider text-white">
                 PROFILE HANDLE REQUIRED:
               </p>
-              <p className="text-xs text-[#2d3436] mt-0.5 font-medium">
+              <p className="text-xs text-white/95 mt-0.5 font-medium leading-relaxed">
                 {handleWarning}
               </p>
             </div>
           </div>
           <button
             onClick={() => setHandleWarning(null)}
-            className="text-[#4a5568] hover:text-[#2d3436] p-1"
+            className="text-white/80 hover:text-white hover:bg-black/10 p-1 rounded-lg transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
