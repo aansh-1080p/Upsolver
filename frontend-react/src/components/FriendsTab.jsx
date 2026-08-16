@@ -315,11 +315,11 @@ export default function FriendsTab({ cfHandle = '', lcHandle = '', onCompare }) 
     <div className="space-y-6">
       {/* Empty Handle Warning Banner */}
       {handleWarning && (
-        <div className="industrial-panel p-4 border border-[#ff4757] bg-[#fff1f2] text-[#2d3436] flex items-start justify-between gap-3 shadow-[4px_4px_10px_#babecc]">
+        <div className="industrial-panel p-4 border border-[#ff4856] bg-[#fff1f2] text-[#2d3436] flex items-start justify-between gap-3 shadow-[4px_4px_10px_#babecc]">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="h-5 w-5 text-[#ff4757] flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-[#ff4856] flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-bold font-mono uppercase tracking-wider text-[#ff4757]">
+              <p className="text-xs font-bold font-mono uppercase tracking-wider text-[#ff4856]">
                 PROFILE HANDLE REQUIRED:
               </p>
               <p className="text-xs text-[#2d3436] mt-0.5 font-medium">
