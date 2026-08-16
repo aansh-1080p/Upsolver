@@ -6,6 +6,8 @@ export default function HandleHeader({
   setCfHandle,
   lcHandle,
   setLcHandle,
+  difficulty,
+  setDifficulty,
   onRun,
   loading,
   actionText = 'Execute Pipeline',
@@ -34,8 +36,8 @@ export default function HandleHeader({
       </div>
 
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
-        {/* Recessed Input Wells */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+        {/* Recessed Input Wells & Optional Difficulty Switch */}
+        <div className={`grid grid-cols-1 ${difficulty ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4 flex-1`}>
           {/* Codeforces Input */}
           <div>
             <label className="block text-xs font-bold text-[#4a5568] mb-1.5 uppercase tracking-wider font-mono flex items-center gap-1.5">
@@ -69,6 +71,32 @@ export default function HandleHeader({
               />
             </div>
           </div>
+
+          {/* Blended Difficulty Switch (when on problems tab) */}
+          {difficulty && setDifficulty && (
+            <div>
+              <label className="block text-xs font-bold text-[#4a5568] mb-1.5 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <Sliders className="h-3.5 w-3.5 text-[#ff4757]" />
+                Difficulty Tier
+              </label>
+              <div className="flex p-1 bg-[#d8e0ea] rounded-xl shadow-[inset_2px_2px_4px_#babecc,inset_-2px_-2px_4px_#ffffff] h-[42px] items-center">
+                {['easy', 'medium', 'hard'].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDifficulty(d)}
+                    className={`flex-1 py-1.5 text-xs font-bold uppercase transition-all duration-150 cursor-pointer rounded-lg font-mono ${
+                      difficulty === d
+                        ? 'bg-[#e0e5ec] text-[#ff4757] shadow-[inset_1px_1px_3px_#babecc,inset_-1px_-1px_3px_#ffffff]'
+                        : 'text-[#4a5568] hover:text-[#2d3436]'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Primary Safety-Orange Push Button */}

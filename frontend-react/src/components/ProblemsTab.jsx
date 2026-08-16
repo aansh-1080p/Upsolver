@@ -11,9 +11,6 @@ import {
 export default function ProblemsTab({
   problemsData,
   loading,
-  onSearchProblems,
-  difficulty,
-  setDifficulty
 }) {
   const [platformFilter, setPlatformFilter] = useState('all');
   const [tagQuery, setTagQuery] = useState('');
@@ -44,72 +41,52 @@ export default function ProblemsTab({
     }
   };
 
+  if (loading) {
+    return (
+      <div className="industrial-card corner-screws p-12 text-center border border-white/60">
+        <div className="h-12 w-12 border-4 border-[#ff4757]/30 border-t-[#ff4757] rounded-full animate-spin mx-auto mb-4" />
+        <h3 className="text-lg font-extrabold text-[#2d3436] tracking-tight text-embossed">
+          Scanning Problem Banks...
+        </h3>
+        <p className="text-xs text-[#4a5568] font-mono mt-1.5 max-w-md mx-auto">
+          Aggregating curated problems from Codeforces, CSES, and LeetCode tailored to your skill gaps.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Control Bar: Difficulty, Query, and Search Trigger */}
-      <div className="industrial-card corner-screws p-6 border border-white/60">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          {/* 3-Position Tactile Difficulty Switch */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-[#4a5568] uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <SlidersHorizontal className="h-3.5 w-3.5 text-[#ff4757]" />
-              Target Difficulty:
-            </span>
-            <div className="flex p-1 bg-[#d8e0ea] rounded-xl shadow-[inset_2px_2px_4px_#babecc,inset_-2px_-2px_4px_#ffffff]">
-              {['easy', 'medium', 'hard'].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
-                  className={`px-3.5 py-1.5 text-xs font-bold uppercase transition-all duration-150 cursor-pointer rounded-lg font-mono ${
-                    difficulty === d
-                      ? 'bg-[#e0e5ec] text-[#ff4757] shadow-[inset_1px_1px_3px_#babecc,inset_-1px_-1px_3px_#ffffff]'
-                      : 'text-[#4a5568] hover:text-[#2d3436]'
-                  }`}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Trigger Button */}
-          <button
-            onClick={onSearchProblems}
-            disabled={loading}
-            className="btn-industrial-primary py-2.5 px-6"
-          >
-            {loading ? (
-              <>
-                <span className="animate-spin">⟳</span>
-                <span>Scanning Problem Banks...</span>
-              </>
-            ) : (
-              <>
-                <Zap className="h-4 w-4" />
-                <span>Discover Practice Problems</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Weak Topic Chips Banner */}
-        {weakTopics.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-[#babecc]/40 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-[#4a5568] text-xs font-bold font-mono uppercase tracking-wide">
+      {/* Weak Gap Topic Chips (if available) */}
+      {weakTopics.length > 0 && (
+        <div className="industrial-card corner-screws p-4 border border-white/60">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-[#4a5568] text-xs font-bold font-mono uppercase tracking-wide flex items-center gap-1.5">
+              <Zap className="h-3.5 w-3.5 text-[#ff4757]" />
               Target Gap Topics:
             </span>
-            {weakTopics.slice(0, 6).map((t, idx) => (
+            {weakTopics.slice(0, 8).map((t, idx) => (
               <button
                 key={idx}
                 onClick={() => setTagQuery(t.tag)}
-                className="btn-industrial-secondary py-1 px-2.5 text-[11px] font-mono"
+                className={`btn-industrial-secondary py-1 px-2.5 text-[11px] font-mono ${
+                  tagQuery.toLowerCase() === t.tag.toLowerCase() ? 'bg-[#e0e5ec] text-[#ff4757] shadow-[inset_1px_1px_3px_#babecc]' : ''
+                }`}
               >
                 #{t.tag} ({t.fail_rate}% fail)
               </button>
             ))}
+            {tagQuery && (
+              <button
+                onClick={() => setTagQuery('')}
+                className="text-[10px] font-mono text-[#ff4757] hover:underline ml-2"
+              >
+                Clear Filter
+              </button>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Filter / Search Bar */}
       {problems.length > 0 && (

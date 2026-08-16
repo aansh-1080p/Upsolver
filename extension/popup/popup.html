@@ -42,6 +42,14 @@
         <label for="lc-handle">LeetCode</label>
         <input type="text" id="lc-handle" placeholder="e.g. neal_wu" value="doomscrollerfinalboss" spellcheck="false">
       </div>
+      <div class="input-group" id="difficulty-group" hidden>
+        <label>Difficulty</label>
+        <div class="segmented-control" id="difficulty-control">
+          <button class="seg-btn" data-val="easy">Easy</button>
+          <button class="seg-btn active" data-val="medium">Med</button>
+          <button class="seg-btn" data-val="hard">Hard</button>
+        </div>
+      </div>
     </div>
     <button id="run-btn" class="btn-primary">
       <span id="run-btn-text">Generate Report</span>
@@ -207,21 +215,8 @@
 
     <!-- ═══════ PROBLEMS TAB ═══════ -->
     <section id="tab-problems" class="tab-panel">
-      <!-- Controls -->
-      <div class="card">
-        <div class="problems-controls">
-          <div class="difficulty-group">
-            <span class="control-label">Difficulty:</span>
-            <div class="segmented-control" id="difficulty-control">
-              <button class="seg-btn" data-val="easy">Easy</button>
-              <button class="seg-btn active" data-val="medium">Medium</button>
-              <button class="seg-btn" data-val="hard">Hard</button>
-            </div>
-          </div>
-          <button id="problems-search-btn" class="btn-primary">Find Problems</button>
-        </div>
-        <div id="weak-chips" class="chip-row" hidden></div>
-      </div>
+      <!-- Weak Topic Gap Chips -->
+      <div id="weak-chips" class="chip-row card" style="padding: 10px 14px;" hidden></div>
 
       <!-- Filters -->
       <div id="problems-filters" class="filter-bar" hidden>

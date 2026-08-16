@@ -147,13 +147,19 @@ function switchTab(tabId) {
     p.classList.toggle('active', p.id === `tab-${tabId}`);
   });
 
-  // Update run button text
+  // Update run button text & difficulty selector visibility
   const texts = {
     report: 'Generate Report',
     plan: 'Create Study Plan',
     problems: 'Find Problems',
   };
   $('#run-btn-text').textContent = texts[tabId] || 'Run';
+
+  const diffGroup = $('#difficulty-group');
+  if (diffGroup) {
+    if (tabId === 'problems') show(diffGroup);
+    else hide(diffGroup);
+  }
 }
 
 /* ── Run Button ─────────────────────────────────────────────── */
@@ -1297,14 +1303,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#tag-search').addEventListener('input', (e) => {
     state.tagQuery = e.target.value;
     if (state.problemsData) renderProblemCards(state.problemsData.problems || []);
-  });
-
-  // Problems tab — search button
-  $('#problems-search-btn').addEventListener('click', () => {
-    const cf = $('#cf-handle').value.trim();
-    const lc = $('#lc-handle').value.trim();
-    if (!cf && !lc) { showToast('Enter at least one handle.'); return; }
-    runProblems(cf, lc);
   });
 
   // Friends tab events

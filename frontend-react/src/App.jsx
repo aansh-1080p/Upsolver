@@ -310,6 +310,8 @@ export default function App() {
             setCfHandle={handleUpdateCf}
             lcHandle={lcHandle}
             setLcHandle={handleUpdateLc}
+            difficulty={activeTab === 'problems' ? difficulty : undefined}
+            setDifficulty={activeTab === 'problems' ? setDifficulty : undefined}
             onRun={
               activeTab === 'report'
                 ? handleGenerateReport
@@ -362,9 +364,6 @@ export default function App() {
             <ProblemsTab
               problemsData={problemsData}
               loading={problemsLoading}
-              onSearchProblems={handleSearchProblems}
-              difficulty={difficulty}
-              setDifficulty={setDifficulty}
             />
           )}
 
