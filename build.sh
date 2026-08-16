@@ -6,14 +6,14 @@ echo "========================================="
 echo "  Building Upsolver for Production       "
 echo "========================================="
 
-echo "1. Installing Python dependencies..."
-if command -v pip3 &>/dev/null; then
-  pip3 install -r requirements.txt
-elif command -v pip &>/dev/null; then
-  pip install -r requirements.txt
-else
-  python3 -m pip install -r requirements.txt
+# Auto-activate local venv if it exists and we are not in cloud container
+if [ -d "venv" ] && [ -z "$VIRTUAL_ENV" ]; then
+  echo "⚡ Activating local venv..."
+  source venv/bin/activate
 fi
+
+echo "1. Installing Python dependencies..."
+pip install -r requirements.txt || pip3 install -r requirements.txt || python3 -m pip install -r requirements.txt
 
 echo "2. Building React Frontend..."
 cd frontend-react
