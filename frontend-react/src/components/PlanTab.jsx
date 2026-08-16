@@ -732,11 +732,12 @@ export default function PlanTab({
                   key={idx}
                   className={`industrial-card corner-screws p-5 flex flex-col justify-between transition-all ${
                     isReattempt
-                      ? 'bg-[#f38a93] border border-[#f0717c] text-white shadow-[0_6px_20px_rgba(243,138,147,0.4)]'
+                      ? 'card-reattempt !bg-[#f38a93] !border-[#f0717c] !text-white'
                       : isWeekDone
                       ? 'border-[#10b981]/50 bg-[#f4fdf8]'
                       : ''
                   }`}
+                  style={isReattempt ? { backgroundColor: '#f38a93', color: '#ffffff', borderColor: '#f0717c' } : undefined}
                 >
                   <div className="space-y-3.5">
                     {/* Header */}
