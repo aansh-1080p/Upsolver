@@ -303,36 +303,34 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Handle Inputs (Shown on Report, Plan, and Problems tabs; Friends has integrated arena) */}
-        {activeTab !== 'friends' && (
-          <HandleHeader
-            cfHandle={cfHandle}
-            setCfHandle={handleUpdateCf}
-            lcHandle={lcHandle}
-            setLcHandle={handleUpdateLc}
-            difficulty={activeTab === 'problems' ? difficulty : undefined}
-            setDifficulty={activeTab === 'problems' ? setDifficulty : undefined}
-            onRun={
-              activeTab === 'report'
-                ? handleGenerateReport
-                : activeTab === 'plan'
-                ? () => handleGeneratePlan({ goal: 'Improve competitive programming skills' })
-                : activeTab === 'problems'
-                ? handleSearchProblems
-                : undefined
-            }
-            loading={reportLoading || planLoading || problemsLoading}
-            actionText={
-              activeTab === 'report'
-                ? 'Execute Report'
-                : activeTab === 'plan'
-                ? 'Synthesize Plan'
-                : activeTab === 'problems'
-                ? 'Discover Problems'
-                : 'Execute Pipeline'
-            }
-          />
-        )}
+        {/* Handle Inputs (Shown on all tabs; run button is omitted on Friends tab) */}
+        <HandleHeader
+          cfHandle={cfHandle}
+          setCfHandle={handleUpdateCf}
+          lcHandle={lcHandle}
+          setLcHandle={handleUpdateLc}
+          difficulty={activeTab === 'problems' ? difficulty : undefined}
+          setDifficulty={activeTab === 'problems' ? setDifficulty : undefined}
+          onRun={
+            activeTab === 'report'
+              ? handleGenerateReport
+              : activeTab === 'plan'
+              ? () => handleGeneratePlan({ goal: 'Improve competitive programming skills' })
+              : activeTab === 'problems'
+              ? handleSearchProblems
+              : undefined
+          }
+          loading={reportLoading || planLoading || problemsLoading}
+          actionText={
+            activeTab === 'report'
+              ? 'Execute Report'
+              : activeTab === 'plan'
+              ? 'Synthesize Plan'
+              : activeTab === 'problems'
+              ? 'Discover Problems'
+              : 'Execute Pipeline'
+          }
+        />
 
         {/* Tab Content */}
         <div>

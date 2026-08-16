@@ -15,12 +15,27 @@ import {
   CheckCircle2,
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
   Sparkles,
-  HelpCircle
+  HelpCircle,
+  X,
+  Flame,
+  ShieldAlert,
+  ArrowRight
 } from 'lucide-react';
-import { getContests, refreshFriendsBatch } from '../api';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend
+} from 'recharts';
+import { getContests, refreshFriendsBatch, comparePeers } from '../api';
 
-export default function FriendsTab({ onLaunchDuel }) {
+export default function FriendsTab({ cfHandle = '', lcHandle = '', onCompare }) {
   const [friends, setFriends] = useState(() => {
     try {
       const saved = localStorage.getItem('upsolver_web_friends');
@@ -86,6 +101,54 @@ export default function FriendsTab({ onLaunchDuel }) {
 
   // Hover state for tooltip on friend cards
   const [hoveredFriendId, setHoveredFriendId] = useState(null);
+
+  // Peer Duel Battle Arena State
+  const [duelData, setDuelData] = useState(null);
+  const [duelLoading, setDuelLoading] = useState(false);
+  const [duelError, setDuelError] = useState(null);
+  const [activeDuelFriend, setActiveDuelFriend] = useState(null);
+  const [handleWarning, setHandleWarning] = useState(null);
+
+  // Trigger Peer Battle against a friend
+  const handleLaunchPeerBattle = async (friend) => {
+    const cf = (cfHandle || '').trim();
+    const lc = (lcHandle || '').trim();
+
+    if (!cf && !lc) {
+      setHandleWarning('Please fill your Codeforces or LeetCode handle in the input fields above to launch a peer battle.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => setHandleWarning(null), 6000);
+      return;
+    }
+
+    setHandleWarning(null);
+    setDuelError(null);
+    setActiveDuelFriend(friend);
+    setDuelLoading(true);
+
+    try {
+      if (onCompare) {
+        const res = await onCompare({ peer_cf: friend.cf || '', peer_lc: friend.lc || '' });
+        if (res) {
+          setDuelData(res);
+        } else {
+          setDuelError('Failed to generate peer comparison. Please verify handles.');
+        }
+      } else {
+        const res = await comparePeers({
+          cf_username: cf,
+          lc_username: lc,
+          peer_cf: friend.cf || '',
+          peer_lc: friend.lc || '',
+        });
+        setDuelData(res);
+      }
+    } catch (err) {
+      setDuelError(err.message || 'Failed to execute peer battle');
+    } finally {
+      setDuelLoading(false);
+    }
+  };
 
   // Save friends to localStorage whenever state changes
   const persistFriends = useCallback((updatedList) => {
@@ -195,8 +258,245 @@ export default function FriendsTab({ onLaunchDuel }) {
     );
   }, [friends, searchQuery]);
 
+  // Battle Arena Metrics Calculation
+  const duelComparison = duelData?.comparison || {};
+  const duelYouData = duelData?.you || {};
+  const duelPeerData = duelData?.peer || {};
+  const duelDiff = duelComparison.diff || {};
+
+  const duelHostCfHandle = duelYouData.cf_data?.handle || duelComparison.your_handle || cfHandle || 'Host';
+  const duelHostCfRating = duelYouData.cf_data?.rating || duelComparison.you?.cf?.cf_rating || '—';
+  const duelHostCfMax = duelYouData.cf_data?.maxRating || duelComparison.you?.cf?.cf_max_rating || '—';
+  const duelHostLcSolved = duelYouData.lc_data?.total_solved ?? duelComparison.you?.lc?.lc_solved ?? 0;
+  const duelHostLcRating = duelYouData.lc_data?.contest_rating ? Math.round(duelYouData.lc_data.contest_rating) : (duelComparison.you?.lc?.lc_rating || '—');
+
+  const duelRivalName = activeDuelFriend?.name || duelPeerData.cf_data?.handle || duelComparison.peer_handle || 'Rival';
+  const duelRivalCfHandle = duelPeerData.cf_data?.handle || activeDuelFriend?.cf || 'Rival';
+  const duelRivalCfRating = duelPeerData.cf_data?.rating || duelComparison.peer?.cf?.cf_rating || '—';
+  const duelRivalCfMax = duelPeerData.cf_data?.maxRating || duelComparison.peer?.cf?.cf_max_rating || '—';
+  const duelRivalLcSolved = duelPeerData.lc_data?.total_solved ?? duelComparison.peer?.lc?.lc_solved ?? 0;
+  const duelRivalLcRating = duelPeerData.lc_data?.contest_rating ? Math.round(duelPeerData.lc_data.contest_rating) : (duelComparison.peer?.lc?.lc_rating || '—');
+
+  const historyA = duelYouData.cf_data?.contest_history || [];
+  const historyB = duelPeerData.cf_data?.contest_history || [];
+  const maxLen = Math.max(historyA.length, historyB.length);
+
+  const duelChartData = [];
+  for (let i = 0; i < maxLen; i++) {
+    duelChartData.push({
+      contest: `#${i + 1}`,
+      hostRating: historyA[i]?.newRating || null,
+      rivalRating: historyB[i]?.newRating || null,
+    });
+  }
+
+  const getDeltaBadge = (delta = 0) => {
+    if (delta > 0) {
+      return (
+        <span className="px-2 py-0.5 text-xs font-bold font-mono rounded-md bg-[#ecfdf5] text-[#10b981] border border-[#10b981]/30">
+          +{delta} LEAD
+        </span>
+      );
+    } else if (delta < 0) {
+      return (
+        <span className="px-2 py-0.5 text-xs font-bold font-mono rounded-md bg-[#fff1f2] text-[#ff4757] border border-[#ff4757]/30">
+          {delta} BEHIND
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 text-xs font-bold font-mono rounded-md bg-[#f0f2f5] text-[#4a5568]">
+        TIED
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
+      {/* Empty Handle Warning Banner */}
+      {handleWarning && (
+        <div className="industrial-panel p-4 border border-[#ff4757] bg-[#fff1f2] text-[#2d3436] flex items-start justify-between gap-3 shadow-[4px_4px_10px_#babecc]">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="h-5 w-5 text-[#ff4757] flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold font-mono uppercase tracking-wider text-[#ff4757]">
+                PROFILE HANDLE REQUIRED:
+              </p>
+              <p className="text-xs text-[#2d3436] mt-0.5 font-medium">
+                {handleWarning}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setHandleWarning(null)}
+            className="text-[#4a5568] hover:text-[#2d3436] p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Peer Battle Loading Indicator */}
+      {duelLoading && (
+        <div className="industrial-card corner-screws p-8 text-center border-2 border-[#ff4757]/60 bg-[#fff5f5]">
+          <div className="h-10 w-10 border-4 border-[#ff4757]/30 border-t-[#ff4757] rounded-full animate-spin mx-auto mb-3" />
+          <h3 className="text-sm font-extrabold text-[#2d3436] tracking-tight text-embossed uppercase font-mono">
+            Analyzing Battle Metrics vs {activeDuelFriend?.name || 'Rival'}...
+          </h3>
+          <p className="text-xs text-[#4a5568] font-mono mt-1">
+            Running algorithmic head-to-head comparison and competitive rating overlay.
+          </p>
+        </div>
+      )}
+
+      {/* Head-to-Head Peer Battle Arena Results */}
+      {duelData && !duelLoading && (
+        <div className="industrial-card corner-screws p-6 border-2 border-[#ff4757]/50 shadow-[6px_6px_14px_#babecc,-6px_-6px_14px_#ffffff] space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-[#babecc]/50">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-[#ff4757] text-white flex items-center justify-center shadow-md">
+                <Swords className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-[#2d3436] tracking-tight text-embossed">
+                  HEAD-TO-HEAD BATTLE ARENA
+                </h3>
+                <p className="text-xs text-[#4a5568] font-mono">
+                  {duelHostCfHandle} vs {duelRivalName}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setDuelData(null)}
+              className="btn-industrial-secondary py-1.5 px-3 text-xs font-mono flex items-center gap-1"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Close Arena</span>
+            </button>
+          </div>
+
+          {/* Dual Profile Fighter Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Host Card (You) */}
+            <div className="industrial-card p-5 border border-[#10b981]/40 bg-[#f0fdf4]">
+              <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#10b981]/20">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-[#10b981] text-white flex items-center justify-center font-bold text-xs">
+                    YOU
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-[#2d3436] font-mono">{duelHostCfHandle}</h4>
+                    <span className="text-[10px] text-[#4a5568] font-mono">Host Unit</span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 text-[10px] font-bold font-mono rounded bg-[#10b981] text-white">
+                  PRIMARY
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2 rounded bg-white/60">
+                  <span className="text-[10px] text-[#718096] font-mono block">CF Rating</span>
+                  <span className="text-base font-black text-[#2d3436] font-mono">{duelHostCfRating}</span>
+                  <div className="mt-1">{getDeltaBadge(duelDiff.cf_rating)}</div>
+                </div>
+                <div className="p-2 rounded bg-white/60">
+                  <span className="text-[10px] text-[#718096] font-mono block">CF Peak</span>
+                  <span className="text-base font-black text-[#2d3436] font-mono">{duelHostCfMax}</span>
+                  <div className="mt-1">{getDeltaBadge(duelDiff.cf_max_rating)}</div>
+                </div>
+                <div className="p-2 rounded bg-white/60">
+                  <span className="text-[10px] text-[#718096] font-mono block">LC Solved</span>
+                  <span className="text-base font-black text-[#ff4757] font-mono">{duelHostLcSolved}</span>
+                  <div className="mt-1">{getDeltaBadge(duelDiff.lc_solved)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rival Card (Competitor) */}
+            <div className="industrial-card p-5 border border-[#ff4757]/40 bg-[#fff5f5]">
+              <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#ff4757]/20">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-[#ff4757] text-white flex items-center justify-center font-bold text-xs">
+                    VS
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-[#2d3436] font-mono">{duelRivalName}</h4>
+                    <span className="text-[10px] text-[#4a5568] font-mono">{duelRivalCfHandle}</span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 text-[10px] font-bold font-mono rounded bg-[#ff4757] text-white">
+                  RIVAL
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2 rounded bg-white/60">
+                  <span className="text-[10px] text-[#718096] font-mono block">CF Rating</span>
+                  <span className="text-base font-black text-[#2d3436] font-mono">{duelRivalCfRating}</span>
+                  <div className="mt-1 text-[10px] font-mono text-[#718096]">Benchmark</div>
+                </div>
+                <div className="p-2 rounded bg-white/60">
+                  <span className="text-[10px] text-[#718096] font-mono block">CF Peak</span>
+                  <span className="text-base font-black text-[#2d3436] font-mono">{duelRivalCfMax}</span>
+                  <div className="mt-1 text-[10px] font-mono text-[#718096]">Benchmark</div>
+                </div>
+                <div className="p-2 rounded bg-white/60">
+                  <span className="text-[10px] text-[#718096] font-mono block">LC Solved</span>
+                  <span className="text-base font-black text-[#ff4757] font-mono">{duelRivalLcSolved}</span>
+                  <div className="mt-1 text-[10px] font-mono text-[#718096]">Benchmark</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Rating Progression Overlay Chart */}
+          {duelChartData.length > 0 && (
+            <div className="industrial-card p-4">
+              <div className="flex items-center gap-2 pb-2 mb-2 border-b border-[#babecc]/40">
+                <TrendingUp className="h-4 w-4 text-[#ff4757]" />
+                <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-[#2d3436]">
+                  Rating Progression History Overlay
+                </h4>
+              </div>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={duelChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" vertical={false} />
+                    <XAxis dataKey="contest" stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} tickLine={false} />
+                    <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#4a5568', fontFamily: 'JetBrains Mono' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#2d3436',
+                        borderColor: '#4a5568',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        color: '#f0f2f5'
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'JetBrains Mono' }} />
+                    <Line type="monotone" name={`You (${duelHostCfHandle})`} dataKey="hostRating" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2 }} />
+                    <Line type="monotone" name={`Rival (${duelRivalName})`} dataKey="rivalRating" stroke="#ff4757" strokeWidth={2.5} dot={{ r: 2 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Strategic Breakdown Narrative */}
+          {duelComparison.narrative && (
+            <div className="industrial-panel p-4 border border-[#ff4757]/30 bg-white/70">
+              <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-[#ff4757] flex items-center gap-1.5 mb-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI Coach Strategic Duel Breakdown
+              </h4>
+              <p className="text-xs text-[#2d3436] leading-relaxed">
+                {duelComparison.narrative}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
       {/* Top Header Console Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -611,7 +911,7 @@ export default function FriendsTab({ onLaunchDuel }) {
                 <div className="mt-4 pt-3 border-t border-[#babecc]/40 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => onLaunchDuel && onLaunchDuel(f)}
+                    onClick={() => handleLaunchPeerBattle(f)}
                     className="btn-industrial-primary py-2 px-4 text-xs w-full flex items-center justify-center gap-2"
                   >
                     <Swords className="h-3.5 w-3.5" />

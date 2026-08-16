@@ -249,6 +249,28 @@
 
     <!-- ═══════ FRIENDS TAB ═══════ -->
     <section id="tab-friends" class="tab-panel">
+      <!-- Inline Peer Duel Battle Arena Card -->
+      <div id="friend-duel-card" class="card" style="border: 2px solid var(--accent);" hidden>
+        <div class="card-header">
+          <h3 id="duel-card-title">⚔️ Head-to-Head Battle</h3>
+          <button id="close-duel-btn" class="btn-secondary text-xs" type="button" style="padding: 2px 8px;">✕ Close</button>
+        </div>
+        <div id="duel-loading" class="loading-state" hidden>
+          <div class="spinner-lg"></div>
+          <p>Analyzing competitor battle metrics…</p>
+        </div>
+        <div id="duel-content" hidden>
+          <div class="compare-cards">
+            <div id="duel-you" class="card compare-card compare-you"></div>
+            <div id="duel-peer" class="card compare-card compare-peer"></div>
+          </div>
+          <div class="card" id="duel-narrative-card" style="margin-top: 10px;">
+            <div class="card-header"><h4 class="tag-section-title" style="color: var(--accent);">Strategic Breakdown</h4></div>
+            <div id="duel-narrative" class="narrative" style="font-size: 11px;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Live Contest Radar & Standings -->
       <div class="card contest-radar-card">
         <div class="card-header">

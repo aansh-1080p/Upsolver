@@ -155,6 +155,12 @@ function switchTab(tabId) {
   };
   $('#run-btn-text').textContent = texts[tabId] || 'Run';
 
+  const runBtn = $('#run-btn');
+  if (runBtn) {
+    if (tabId === 'friends') hide(runBtn);
+    else show(runBtn);
+  }
+
   const diffGroup = $('#difficulty-group');
   if (diffGroup) {
     if (tabId === 'problems') show(diffGroup);
@@ -1255,6 +1261,84 @@ async function handleRefreshAllFriends() {
 
 
 
+async function runFriendPeerBattle(friend) {
+  const cf = $('#cf-handle').value.trim();
+  const lc = $('#lc-handle').value.trim();
+
+  if (!cf && !lc) {
+    showToast('Please fill your Codeforces or LeetCode handle in the top input fields to launch a peer battle.');
+    $('#cf-handle').focus();
+    return;
+  }
+
+  const duelCard = $('#friend-duel-card');
+  const duelLoading = $('#duel-loading');
+  const duelContent = $('#duel-content');
+  const duelTitle = $('#duel-card-title');
+
+  show(duelCard);
+  show(duelLoading);
+  hide(duelContent);
+  duelTitle.textContent = `⚔️ Battle: You vs ${friend.name || friend.cf || 'Rival'}`;
+  duelCard.scrollIntoView({ behavior: 'smooth' });
+
+  try {
+    const data = await apiPost('/compare', {
+      cf_username: cf,
+      lc_username: lc,
+      peer_cf: friend.cf || '',
+      peer_lc: friend.lc || ''
+    });
+
+    const cmp = data?.comparison || {};
+    const youCf = cmp?.you?.cf || {};
+    const youLc = cmp?.you?.lc || {};
+    const peerCfStats = cmp?.peer?.cf || {};
+    const peerLcStats = cmp?.peer?.lc || {};
+    const diff = cmp?.diff || {};
+    const yourHandle = cmp?.your_handle || cf || 'You';
+    const peerHandle = cmp?.peer_handle || friend.name || friend.cf || 'Rival';
+
+    $('#duel-you').innerHTML = `
+      <div class="compare-handle">
+        <span class="compare-name">${escHtml(yourHandle)}</span>
+        <span class="compare-role role-primary">YOU</span>
+      </div>
+      <div class="compare-stats">
+        <div class="compare-stat"><div class="stat-label">CF Rating</div><div class="stat-val" style="color:#60a5fa">${youCf.cf_rating || '—'}</div>${deltaHtml(diff.cf_rating)}</div>
+        <div class="compare-stat"><div class="stat-label">CF Peak</div><div class="stat-val" style="color:#818cf8">${youCf.cf_max_rating || '—'}</div>${deltaHtml(diff.cf_max_rating)}</div>
+        <div class="compare-stat"><div class="stat-label">LC Solved</div><div class="stat-val" style="color:#fbbf24">${youLc.lc_solved || 0}</div>${deltaHtml(diff.lc_solved)}</div>
+      </div>
+    `;
+
+    $('#duel-peer').innerHTML = `
+      <div class="compare-handle">
+        <span class="compare-name">${escHtml(peerHandle)}</span>
+        <span class="compare-role role-rival">RIVAL</span>
+      </div>
+      <div class="compare-stats">
+        <div class="compare-stat"><div class="stat-label">CF Rating</div><div class="stat-val" style="color:#f87171">${peerCfStats.cf_rating || '—'}</div><div class="stat-delta delta-tied">Benchmark</div></div>
+        <div class="compare-stat"><div class="stat-label">CF Peak</div><div class="stat-val" style="color:#fb7185">${peerCfStats.cf_max_rating || '—'}</div><div class="stat-delta delta-tied">Benchmark</div></div>
+        <div class="compare-stat"><div class="stat-label">LC Solved</div><div class="stat-val" style="color:#fbbf24">${peerLcStats.lc_solved || 0}</div><div class="stat-delta delta-tied">Benchmark</div></div>
+      </div>
+    `;
+
+    if (cmp.narrative) {
+      $('#duel-narrative').textContent = cmp.narrative;
+      show($('#duel-narrative-card'));
+    } else {
+      hide($('#duel-narrative-card'));
+    }
+
+    show(duelContent);
+  } catch (err) {
+    showToast(err.message || 'Failed to execute peer battle');
+    hide(duelCard);
+  } finally {
+    hide(duelLoading);
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    EVENT LISTENERS (no inline handlers — MV3 compliant)
    ═══════════════════════════════════════════════════════════════ */
@@ -1308,13 +1392,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Friends tab events
   $('#add-friend-btn')?.addEventListener('click', handleAddFriend);
   $('#refresh-all-friends-btn')?.addEventListener('click', handleRefreshAllFriends);
+  $('#close-duel-btn')?.addEventListener('click', () => hide($('#friend-duel-card')));
 
-  // Delegated events for Friends list (Refresh / Delete)
+  // Delegated events for Friends list (Duel / Refresh / Delete)
   $('#friends-list')?.addEventListener('click', async (e) => {
+    const duelBtn = e.target.closest('[data-duel-friend]');
     const refreshBtn = e.target.closest('[data-refresh-friend]');
     const deleteBtn = e.target.closest('[data-delete-friend]');
 
-    if (refreshBtn) {
+    if (duelBtn) {
+      const friend = state.friends.find(f => f.id === duelBtn.dataset.duelFriend);
+      if (friend) await runFriendPeerBattle(friend);
+    } else if (refreshBtn) {
       await handleRefreshFriend(refreshBtn.dataset.refreshFriend);
     } else if (deleteBtn) {
       await handleDeleteFriend(deleteBtn.dataset.deleteFriend);
