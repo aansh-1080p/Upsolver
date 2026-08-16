@@ -1347,6 +1347,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Health check
   await checkHealth();
 
+  // Brand click navigation to Report tab
+  $('#brand-link')?.addEventListener('click', () => switchTab('report'));
+
   // Tab navigation
   $$('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));

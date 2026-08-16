@@ -121,12 +121,28 @@ body {
   text-shadow: 0 1px 0 #ffffff;
 }
 
-.header-sub {
-  font-size: 10px;
-  color: var(--text-secondary);
+.header-left.cursor-pointer {
+  cursor: pointer;
+  user-select: none;
+}
+
+.header-left.cursor-pointer:hover .header-title {
+  color: var(--accent);
+}
+
+.header-left.cursor-pointer:hover .logo-mark {
+  border-color: rgba(255, 72, 86, 0.4);
+}
+
+.version-badge {
+  font-size: 9px;
+  font-weight: 800;
   font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  box-shadow: inset 1px 1px 2px var(--border-shadow);
 }
 
 .header-right {

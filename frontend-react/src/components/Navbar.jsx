@@ -14,23 +14,24 @@ export default function Navbar({ health, activeTab, setActiveTab }) {
   return (
     <header className="sticky top-0 z-50 bg-[#e0e5ec] border-b border-[#babecc]/50 px-4 sm:px-8 py-3 shadow-[0_4px_12px_rgba(186,190,204,0.4)] backdrop-blur-md">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Brand Console Badge */}
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-[#e0e5ec] shadow-[inset_2px_2px_5px_#babecc,inset_-2px_-2px_5px_#ffffff] flex items-center justify-center border border-white/60">
-            <Shield className="h-5 w-5 text-[#ff4757]" />
+        {/* Brand Console Badge (Click to return to Report [01]) */}
+        <div
+          onClick={() => setActiveTab('report')}
+          className="flex items-center gap-3 cursor-pointer select-none group"
+          title="Return to Report [01]"
+        >
+          <div className="h-10 w-10 rounded-xl bg-[#e0e5ec] shadow-[inset_2px_2px_5px_#babecc,inset_-2px_-2px_5px_#ffffff] flex items-center justify-center border border-white/60 group-hover:border-[#ff4856]/40 transition-colors">
+            <Shield className="h-5 w-5 text-[#ff4856] group-hover:scale-105 transition-transform" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl font-extrabold tracking-tight text-[#2d3436] text-embossed">
+              <span className="text-xl font-extrabold tracking-tight text-[#2d3436] text-embossed group-hover:text-[#ff4856] transition-colors">
                 UPSOLVER
               </span>
               <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-[#d1d9e6] text-[#4a5568] shadow-[inset_1px_1px_2px_#babecc] font-mono uppercase">
-                v2.0 CONSOLE
+                V2
               </span>
             </div>
-            <p className="text-xs text-[#4a5568] font-medium tracking-tight">
-              Tactile Competitive Programming Intelligence
-            </p>
           </div>
         </div>
 
