@@ -59,6 +59,9 @@ English
 • Live contest radar scanning active Codeforces rounds with real-time friend ranks.
 • Launch 1-Click Head-to-Head Peer Duels: compare fighter cards, rating trajectories, and receive AI strategic battle breakdowns.
 
+⌨️ 5. INSTANT KEYBOARD ACCESS
+• Launch the extension instantly anytime with Command+Shift+U (Mac) / Ctrl+Shift+U (Windows/Linux). Customizable in chrome://extensions/shortcuts.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔒 PRIVACY-FIRST & OPEN ARCHITECTURE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
