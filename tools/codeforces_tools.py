@@ -88,9 +88,9 @@ async def fetch_cf_rating_history(handle: str) -> list[dict]:
             return [{"error": str(e)}]
 
 
-async def fetch_cf_submissions(handle: str, count: int = 200) -> list[dict]:
+async def fetch_cf_submissions(handle: str, count: int = 10000) -> list[dict]:
     """
-    Fetch last `count` submissions for a CF handle.
+    Fetch submissions for a CF handle (up to `count`, default 10,000 to cover full history).
     Returns list of submissions with verdict, tags, timestamp, language.
     """
     async with httpx.AsyncClient() as client:
@@ -137,7 +137,7 @@ async def fetch_all_cf_data(handle: str) -> dict:
     """
     user_info_task = fetch_cf_user_info(handle)
     rating_history_task = fetch_cf_rating_history(handle)
-    submissions_task = fetch_cf_submissions(handle, count=200)
+    submissions_task = fetch_cf_submissions(handle, count=10000)
 
     user_info, rating_history, submissions = await asyncio.gather(
         user_info_task,
@@ -145,12 +145,15 @@ async def fetch_all_cf_data(handle: str) -> dict:
         submissions_task,
     )
 
-    # Count distinct solved problems (verdict OK, unique problem name)
+    # Count distinct solved problems accurately (verdict OK, unique contestId+index or problem_name)
     seen = set()
     solved_count = 0
     for sub in submissions:
         if sub.get("verdict") == "OK":
-            key = sub.get("problem_name", "")
+            cid = sub.get("contest_id")
+            idx = sub.get("problem_index")
+            name = sub.get("problem_name", "")
+            key = f"{cid}_{idx}" if cid and idx else name
             if key and key not in seen:
                 seen.add(key)
                 solved_count += 1
