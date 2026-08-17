@@ -132,6 +132,38 @@ _TOPIC_RESOURCES: dict[str, list[dict]] = {
     ],
 }
 
+_TOPIC_SUBTOPICS: dict[str, list[str]] = {
+    "dynamic programming": ["1D State Formulations & Transitions", "0/1 & Unbounded Knapsack Variants", "Interval DP & DP on Trees"],
+    "dp":                  ["1D State Formulations & Transitions", "0/1 & Unbounded Knapsack Variants", "Interval DP & DP on Trees"],
+    "graphs":              ["BFS/DFS & Connected Components", "Dijkstra & Shortest Path Trees", "Disjoint Set Union & Topological Sort"],
+    "graph":               ["BFS/DFS & Connected Components", "Dijkstra & Shortest Path Trees", "Disjoint Set Union & Topological Sort"],
+    "trees":               ["Tree Traversals & Diameter", "Lowest Common Ancestor (LCA)", "Subtree DP & Tree Flattening"],
+    "binary search":       ["Binary Search on Monotonic Functions", "Search Space Reduction & Lower Bound", "Predicate Inversion (BS on Answer)"],
+    "greedy":              ["Interval Scheduling & Sorting", "Exchange Arguments & Priority Greedy", "Constructive Greedy Invariants"],
+    "segment tree":        ["Point Updates & Range Sum Queries", "Lazy Propagation for Range Updates", "Dynamic Segment Trees"],
+    "number theory":       ["Sieve of Eratosthenes & Prime Factorization", "Modular Arithmetic & Fast Exponentiation", "GCD/LCM & Extended Euclidean"],
+    "strings":             ["String Hashing & Collision Handling", "KMP Prefix Function", "Trie & Prefix Matching"],
+    "math":                ["Combinatorics & Modular Inverses", "Matrix Exponentiation for Recurrences", "Inclusion-Exclusion Principle"],
+    "sorting":             ["Two Pointers with Sorted Arrays", "Coordinate Compression", "Custom Comparators & Inversion Counting"],
+    "two pointers":        ["Sliding Window Maximum / Minimum", "Opposite Direction Converging Pointers", "Prefix Sums with Pointers"],
+    "hashing":             ["Frequency Counting & Hash Maps", "Rolling Hash for Substrings", "Hash Set for Uniqueness & Meet-in-the-Middle"],
+    "bit manipulation":    ["Bitwise Operations & Submask Enumeration", "Bitmask Dynamic Programming", "Fenwick Tree (Binary Indexed Tree)"],
+    "union find":          ["Disjoint Set Union with Path Compression", "Union by Rank / Size", "Cycle Detection in Undirected Graphs"],
+    "shortest path":       ["Dijkstra's Algorithm with Priority Queue", "0-1 BFS for Uniform Weights", "Floyd-Warshall All-Pairs Shortest Path"],
+    "backtracking":        ["State Space Search & Pruning", "Subset & Permutation Generation", "Constraint Satisfaction (N-Queens)"],
+    "heap":                ["Top K Elements & Running Median", "Task Scheduling with Priority Queue", "Merge K Sorted Structures"],
+    "constructive":        ["Pattern Induction & Small Cases", "Invariant Maintenance", "Parity & Boundary Constraints"],
+    "_default":            ["Fundamental Algorithms & Analysis", "Standard Implementation Patterns", "Contest-Level Edge Case Mastery"],
+}
+
+def _get_fallback_subtopics(topic: str) -> list[str]:
+    """Return rich curated subtopics for a topic."""
+    t = topic.lower()
+    for key in _TOPIC_SUBTOPICS:
+        if key != "_default" and key in t:
+            return _TOPIC_SUBTOPICS[key]
+    return _TOPIC_SUBTOPICS["_default"]
+
 
 def _get_fallback_resources(topic: str) -> list[dict]:
     """Return curated resources for a topic, falling back to defaults."""
@@ -346,7 +378,7 @@ def _call_llm_for_plan_structured(prompt: str) -> list[dict] | None:
         from agents.schemas import StudyPlanOutput
 
         llm = get_llm(temperature=0.3)
-        structured_llm = llm.with_structured_output(StudyPlanOutput)
+        structured_llm = llm.with_structured_output(StudyPlanOutput, method="json_mode")
         result = structured_llm.invoke(prompt)
 
         if isinstance(result, StudyPlanOutput):
@@ -395,7 +427,7 @@ def _fallback_plan(user_prefs: dict, weak_topics: list) -> list[dict]:
         weeks.append({
             "week":             i + 1,
             "topic":            topic,
-            "subtopics":        ["Core theory", "Basic problems", "Contest-level problems"],
+            "subtopics":        _get_fallback_subtopics(topic),
             "resources":        _get_fallback_resources(topic),
             "problems_per_day": 3,
         })

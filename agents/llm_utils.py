@@ -28,6 +28,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Groq model fallback chain (active models on Groq)
+_GROQ_MODELS = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "groq/compound-mini",
+]
+
 # Gemini model fallback chain (tried in order on quota exhaustion)
 _GEMINI_MODELS = [
     "gemini-2.0-flash",
@@ -36,40 +43,31 @@ _GEMINI_MODELS = [
 ]
 
 # How long to wait between retries (seconds)
-_RETRY_DELAYS = [10, 30, 60]
+_RETRY_DELAYS = [3, 8]
 
 
 # ── LLM factory ───────────────────────────────────────────────────────────────
 
-def get_llm(temperature: float = 0.3):
+def get_llm(temperature: float = 0.3, model_override: str = None):
     """
     Returns the best available LLM client.
 
     Priority:
-      1. GROQ_API_KEY → ChatGroq (generous free tier, no daily cap issues)
+      1. GROQ_API_KEY → ChatGroq (openai/gpt-oss-120b, fast & no quota issues)
       2. GOOGLE_API_KEY → ChatGoogleGenerativeAI (gemini-2.0-flash)
-
-    If Groq is not configured, Gemini is used. Gemini calls are wrapped
-    with retry + model-fallback logic in call_llm().
     """
     groq_key   = os.getenv("GROQ_API_KEY", "").strip()
     google_key = os.getenv("GOOGLE_API_KEY", "").strip()
 
-    # cerebras_key = os.getenv("CEREBRAS_API_KEY", "").strip()
-    # if cerebras_key:
-    #     print(f"[LLM] Using Cerebras → llama-3.3-70b")
-    #     from langchain_cerebras import ChatCerebras
-    #     return ChatCerebras(model="llama-3.3-70b", api_key=cerebras_key)
-
     if groq_key:
         from langchain_groq import ChatGroq
-        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+        model = model_override or os.getenv("GROQ_MODEL", _GROQ_MODELS[0]).strip()
         print(f"[LLM] Using Groq → {model}")
         return ChatGroq(model=model, temperature=temperature, api_key=groq_key)
 
     if google_key:
         from langchain_google_genai import ChatGoogleGenerativeAI
-        model = _GEMINI_MODELS[0]
+        model = model_override or _GEMINI_MODELS[0]
         print(f"[LLM] Using Gemini → {model}")
         return ChatGoogleGenerativeAI(
             model=model,
@@ -87,7 +85,7 @@ def get_llm(temperature: float = 0.3):
 
 
 def _is_quota_error(e: Exception) -> bool:
-    """Return True if the exception is a Gemini rate-limit / quota error."""
+    """Return True if the exception is a rate-limit / quota error."""
     msg = str(e).lower()
     return any(x in msg for x in [
         "resource_exhausted", "429", "quota", "rate limit", "ratelimit"
@@ -96,26 +94,31 @@ def _is_quota_error(e: Exception) -> bool:
 
 def call_llm(messages: list, temperature: float = 0.3) -> str:
     """
-    Call the LLM with automatic retry + Gemini model fallback.
-
-    For Groq: single call, no retry needed (Groq rarely rate-limits).
-    For Gemini:
-      - Retry up to 3 times with exponential backoff on 429.
-      - If all retries exhausted, try the next model in _GEMINI_MODELS.
-      - Return empty string if every option fails (callers handle this).
+    Call the LLM with automatic retry + model fallback.
+    Tries Groq models first, then falls back to Gemini if configured.
     """
     groq_key   = os.getenv("GROQ_API_KEY", "").strip()
     google_key = os.getenv("GOOGLE_API_KEY", "").strip()
 
-    # ── Groq path (no retry needed) ───────────────────────────────────────────
+    # ── Groq path with fallback models ───────────────────────────────────────
     if groq_key:
-        try:
-            llm = get_llm(temperature=temperature)
-            resp = llm.invoke(messages)
-            return resp.content or ""
-        except Exception as e:
-            print(f"[LLM] Groq call failed: {type(e).__name__}: {e}")
-            return ""
+        from langchain_groq import ChatGroq
+        configured_model = os.getenv("GROQ_MODEL", "").strip()
+        models_to_try = [configured_model] if configured_model else []
+        for m in _GROQ_MODELS:
+            if m not in models_to_try:
+                models_to_try.append(m)
+
+        for model in models_to_try:
+            try:
+                llm = ChatGroq(model=model, temperature=temperature, api_key=groq_key)
+                resp = llm.invoke(messages)
+                content = resp.content or ""
+                if content:
+                    return content
+            except Exception as e:
+                print(f"[LLM] Groq {model} error: {type(e).__name__}: {e}")
+                continue
 
     # ── Gemini path (retry + model fallback) ──────────────────────────────────
     if not google_key:
