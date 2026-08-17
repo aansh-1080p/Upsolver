@@ -9,3 +9,4 @@ output/
 *.sqlite3
 node_modules/
 dist/
+zip 2/
