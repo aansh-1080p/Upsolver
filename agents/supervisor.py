@@ -1,28 +1,29 @@
 """
-agents/supervisor_agent.py
----------------------------
-Supervisor node — classifies user intent from their message.
-
-Returns one of: "report" | "plan" | "problems" | "all"
-
-Uses the LLM for classification. If LLM fails or returns unexpected output,
-falls back to fast keyword matching so the graph never stalls.
-"""
-
-"""
 agents/supervisor.py
 ---------------------
-Supervisor node — classifies user intent from their message.
+Supervisor node — classifies user intent from their message, then
+dynamically routes to the next node via a LangGraph Command.
 
 Returns one of: "report" | "plan" | "problems" | "all" | "compare"
 
-"compare" is new — triggered when user mentions comparing with someone,
-a friend, peer, rival, or another handle.
+"compare" is triggered when the user mentions comparing with someone, a
+friend, peer, rival, or another handle.
+
+Uses the LLM for classification. If the LLM fails or returns unexpected
+output, falls back to fast keyword matching so the graph never stalls.
+
+Dynamic routing: supervisor_node returns a Command that both updates state
+AND chooses where execution goes next, instead of relying purely on a
+static edge. Concretely: if there's no CF or LC handle to work with at all,
+it short-circuits straight to END rather than running the rest of the
+pipeline (scraper → analyzer → ...) against empty input.
 """
 
 import re
 from graph.state      import AgentState
 from agents.llm_utils import get_text_from_llm
+from langgraph.graph  import END
+from langgraph.types  import Command
 
 VALID_INTENTS = {"report", "plan", "problems", "all", "compare"}
 
@@ -84,32 +85,46 @@ def _classify(user_message: str) -> str:
         return _keyword_fallback(user_message)
 
 
-def supervisor_node(state: AgentState) -> dict:
+def supervisor_node(state: AgentState) -> Command:
     """
-    LangGraph node — classify intent from the last user message.
-    If no messages (CLI mode), keep the existing intent.
+    LangGraph node — classify intent from the last user message, then
+    dynamically route via Command instead of a static add_edge.
+
+    If no messages (CLI mode), keep the existing intent. If there's no CF
+    or LC handle at all, short-circuit straight to END — there's nothing
+    for scraper/analyzer/etc. to do with empty input.
     """
     messages        = state.get("messages") or []
     existing_intent = state.get("intent", "report")
+    errors          = list(state.get("errors") or [])
 
     if existing_intent in VALID_INTENTS and not messages:
-        print(f"[Supervisor] No messages — keeping intent={existing_intent!r}")
-        return {"intent": existing_intent}
+        intent = existing_intent
+        print(f"[Supervisor] No messages — keeping intent={intent!r}")
+    else:
+        user_text = ""
+        for msg in reversed(messages):
+            if hasattr(msg, "content"):
+                user_text = msg.content or ""
+                break
+            if isinstance(msg, dict):
+                user_text = msg.get("content") or msg.get("text") or ""
+                break
 
-    user_text = ""
-    for msg in reversed(messages):
-        if hasattr(msg, "content"):
-            user_text = msg.content or ""
-            break
-        if isinstance(msg, dict):
-            user_text = msg.get("content") or msg.get("text") or ""
-            break
+        if not user_text.strip():
+            intent = existing_intent
+            print(f"[Supervisor] Empty message — defaulting to intent={intent!r}")
+        else:
+            print(f"[Supervisor] Classifying: {user_text[:80]!r}")
+            intent = _classify(user_text)
+            print(f"[Supervisor] Final intent = {intent!r}")
 
-    if not user_text.strip():
-        print(f"[Supervisor] Empty message — defaulting to intent={existing_intent!r}")
-        return {"intent": existing_intent}
+    cf_username = (state.get("cf_username") or "").strip()
+    lc_username = (state.get("lc_username") or "").strip()
 
-    print(f"[Supervisor] Classifying: {user_text[:80]!r}")
-    intent = _classify(user_text)
-    print(f"[Supervisor] Final intent = {intent!r}")
-    return {"intent": intent}
+    if not cf_username and not lc_username:
+        errors.append("[Supervisor] No Codeforces or LeetCode handle provided — nothing to do.")
+        print("[Supervisor] No usable input — routing straight to END.")
+        return Command(goto=END, update={"intent": intent, "errors": errors})
+
+    return Command(goto="scraper", update={"intent": intent})

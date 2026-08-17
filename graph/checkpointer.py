@@ -65,7 +65,7 @@ def get_checkpointer():
 def make_thread_id(cf_username: str, lc_username: str) -> str:
     """
     Generate a stable thread_id for a given user pair.
-    LangGraph uses this to scope checkpoints per conversation/session.
+    LangGraph uses this to store checkpoints per conversation/session.
     """
     cf = (cf_username or "none").lower().strip()
     lc = (lc_username or "none").lower().strip()

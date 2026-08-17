@@ -226,25 +226,51 @@ Write exactly 3 short paragraphs:
 Under 200 words. No bullet points. Plain text only."""
 
 
-def _call_llm_narrative(prompt: str) -> str:
+def _call_llm_narrative(prompt: str, callbacks=None) -> str:
     """
-    Call LLM for free-text narrative using call_llm() which handles
-    Gemini 429 / RESOURCE_EXHAUSTED with automatic retry + model fallback.
+    Generate the free-text narrative by *streaming* tokens from the LLM
+    (via agents.llm_utils.stream_llm_text) rather than a single blocking
+    call. When a LangChain callback list is supplied (threaded in from the
+    frontend via LangGraph's run `config`, NOT via checkpointed state — see
+    analyzer_node below), each token is delivered to it live, which is what
+    lets the UI show the narrative appearing word-by-word as it's actually
+    generated instead of faking that effect after the fact.
+
+    stream_llm_text() itself falls back to the original, battle-tested
+    call_llm() retry/model-fallback chain on any failure, so narrative
+    generation is exactly as reliable as before this change — streaming is
+    strictly an added capability, not a replacement for the safety net.
     """
-    from agents.llm_utils import call_llm
+    from agents.llm_utils import stream_llm_text
     from langchain_core.messages import HumanMessage as HM
-    raw = call_llm([HM(content=prompt)], temperature=0.4)
-    text = get_text_from_llm(raw)
+
+    chunks = []
+    try:
+        for piece in stream_llm_text([HM(content=prompt)], temperature=0.4, callbacks=callbacks):
+            chunks.append(piece)
+    except Exception as e:
+        print(f"[Analyzer] Narrative generation failed entirely: {type(e).__name__}: {e}")
+
+    text = get_text_from_llm("".join(chunks)) if chunks else ""
     return text if text else "[Narrative unavailable — LLM returned empty response]"
 
 
 # ── LangGraph node ────────────────────────────────────────────────────────────
 
-def analyzer_node(state: AgentState) -> dict:
+from langchain_core.runnables import RunnableConfig
+
+def analyzer_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """
     LangGraph node — reads cf_data/lc_data from state,
     computes stats with pandas, generates narrative with LLM.
     Returns partial state update: state["analysis"].
+
+    `config` is LangGraph's standard optional second node argument (NOT
+    part of the persisted/checkpointed state — it's ephemeral per-run
+    config). We read `config["callbacks"]` from it, if present, purely to
+    forward live token-streaming callbacks down to the LLM call. Nothing
+    non-serializable ever touches `state`, so this has zero impact on the
+    SQLite checkpointer's ability to persist state.
     """
     cf_data = state.get("cf_data") or {}
     lc_data = state.get("lc_data") or {}
@@ -254,13 +280,23 @@ def analyzer_node(state: AgentState) -> dict:
         errors.append("[Analyzer] No data to analyze.")
         return {"analysis": None, "errors": errors}
 
-    print("[Analyzer] Running pandas analysis...")
-    cf_stats = _analyze_cf(cf_data)
-    lc_stats = _analyze_lc(lc_data)
+    # Stats are normally already computed by the profile subgraph inside
+    # scraper_node (graph/subgraphs.py). We recompute here only if they're
+    # missing — e.g. an older checkpoint from before this change, or this
+    # node being invoked standalone/in tests without going through
+    # scraper_node first — so analyzer_node keeps working on its own too.
+    cf_stats = state.get("cf_stats") or _analyze_cf(cf_data)
+    lc_stats = state.get("lc_stats") or _analyze_lc(lc_data)
+    if not state.get("cf_stats") or not state.get("lc_stats"):
+        print("[Analyzer] cf_stats/lc_stats not precomputed — computing now.")
+    else:
+        print("[Analyzer] Reusing cf_stats/lc_stats computed by the profile subgraph.")
+
+    callbacks = (config or {}).get("callbacks") if config else None
 
     print("[Analyzer] Calling LLM for narrative...")
     prompt    = _build_narrative_prompt(cf_stats, lc_stats)
-    narrative = _call_llm_narrative(prompt)
+    narrative = _call_llm_narrative(prompt, callbacks=callbacks)
     print(f"[Analyzer] Narrative ready ({len(narrative)} chars).")
 
     analysis = {

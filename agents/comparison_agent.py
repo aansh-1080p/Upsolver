@@ -182,16 +182,29 @@ GAP SUMMARY:
 Write the 3 paragraphs now. Paragraph 1: overall standings using the exact numbers. Paragraph 2: each player's clearest edge over the other, referencing specific tags and rates. Paragraph 3: the single most impactful thing {your_handle} must do in the next 2 weeks to close the gap, be very specific."""
 
 
-def _call_llm(prompt: str) -> str:
+def _call_llm(prompt: str, callbacks=None) -> str:
     """
-    Call LLM and robustly clean the response.
-    Applies _strip_all_noise() on top of get_text_from_llm() to catch
-    all edge cases where think tags are not properly closed.
+    Generate the comparison narrative by streaming tokens from the LLM
+    (see agents.llm_utils.stream_llm_text), so the frontend can display it
+    live as it's generated. `callbacks`, when provided, is a list of
+    LangChain callback handlers threaded in via LangGraph's run `config`
+    (not persisted state — see comparison_agent_node below).
+
+    Falls back to the original call_llm() retry/model-fallback chain (via
+    stream_llm_text's own internal fallback) if streaming isn't available,
+    so reliability is unchanged from before this feature was added.
     """
-    from agents.llm_utils import call_llm
+    from agents.llm_utils import stream_llm_text
     from langchain_core.messages import HumanMessage as HM
 
-    raw  = call_llm([HM(content=prompt)], temperature=0.3)
+    chunks = []
+    try:
+        for piece in stream_llm_text([HM(content=prompt)], temperature=0.3, callbacks=callbacks):
+            chunks.append(piece)
+    except Exception as e:
+        print(f"[Comparison] Narrative generation failed entirely: {type(e).__name__}: {e}")
+
+    raw = "".join(chunks)
     # Two-pass cleaning: strip_all_noise handles unclosed tags,
     # then get_text_from_llm for any remaining standard think blocks
     text = _strip_all_noise(raw)
@@ -201,10 +214,15 @@ def _call_llm(prompt: str) -> str:
 
 # ── LangGraph node ────────────────────────────────────────────────────────────
 
-def comparison_agent_node(state: AgentState) -> dict:
+from langchain_core.runnables import RunnableConfig
+
+def comparison_agent_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """
     LangGraph node — compare primary user vs peer.
     Writes state["comparison"].
+
+    `config` is LangGraph's standard optional second node argument — used
+    here only to forward streaming callbacks (see _call_llm above).
     """
     cf_data  = state.get("cf_data")  or {}
     lc_data  = state.get("lc_data")  or {}
@@ -217,13 +235,18 @@ def comparison_agent_node(state: AgentState) -> dict:
 
     print(f"[Comparison] {your_handle!r} vs {peer_handle!r}")
 
-    you_cf  = _analyze_cf(cf_data)
-    you_lc  = _analyze_lc(lc_data)
-    peer_cf = _analyze_cf(cf_data2)
-    peer_lc = _analyze_lc(lc_data2)
+    # Stats are normally already computed by the profile subgraph inside
+    # scraper_node / peer_scraper_node (graph/subgraphs.py). Recompute here
+    # only if missing, so this node still works if ever invoked standalone.
+    you_cf  = state.get("cf_stats")  or _analyze_cf(cf_data)
+    you_lc  = state.get("lc_stats")  or _analyze_lc(lc_data)
+    peer_cf = state.get("cf_stats2") or _analyze_cf(cf_data2)
+    peer_lc = state.get("lc_stats2") or _analyze_lc(lc_data2)
 
     diff = _build_diff(you_cf, you_lc, peer_cf, peer_lc)
     common_weak, your_edge, peer_edge = _compare_cf_tags(you_cf, peer_cf)
+
+    callbacks = (config or {}).get("callbacks") if config else None
 
     print("[Comparison] Calling LLM...")
     prompt    = _build_comparison_prompt(
@@ -231,7 +254,7 @@ def comparison_agent_node(state: AgentState) -> dict:
         diff, common_weak, your_edge, peer_edge,
         your_handle, peer_handle,
     )
-    narrative = _call_llm(prompt)
+    narrative = _call_llm(prompt, callbacks=callbacks)
     print(f"[Comparison] Narrative ready ({len(narrative)} chars).")
 
     return {

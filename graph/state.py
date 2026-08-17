@@ -12,7 +12,7 @@ v2: Added peer comparison fields:
 from typing import Annotated, Optional, TypedDict
 from langgraph.graph.message import add_messages
 
-
+# state as a class inheriting from TypedDict
 class CFContest(TypedDict):
     contestId: int
     contestName: str
@@ -121,11 +121,24 @@ class AgentState(TypedDict):
     lc_data:  Optional[LCData]
     analysis: Optional[Analysis]
 
+    # Per-platform pandas stats, computed once by the reusable "profile
+    # subgraph" (graph/subgraphs.py) inside scraper_node. Kept separate from
+    # `analysis` (which also carries the LLM narrative) so both analyzer_node
+    # and comparison_agent_node can reuse them without recomputing.
+    cf_stats: Optional[dict]
+    lc_stats: Optional[dict]
+
+    # How many times scrape_guard_node has retried a failed fetch. Capped at
+    # 1 by scrape_guard_node itself — prevents infinite retry loops.
+    scrape_retry_count: int
+
     # ── Peer / comparison ─────────────────────────────────────────────────────
     cf_username2: str                  # peer's Codeforces handle
     lc_username2: str                  # peer's LeetCode username
     cf_data2: Optional[CFData]         # peer's scraped CF data
     lc_data2: Optional[LCData]         # peer's scraped LC data
+    cf_stats2: Optional[dict]          # peer's computed CF stats (see cf_stats above)
+    lc_stats2: Optional[dict]          # peer's computed LC stats (see lc_stats above)
     comparison: Optional[dict]         # output of comparison_agent
 
     # ── Other outputs ─────────────────────────────────────────────────────────

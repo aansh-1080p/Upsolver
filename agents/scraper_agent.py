@@ -112,7 +112,14 @@ def _do_scrape(cf_username: str, lc_username: str,
 # ── LangGraph node: primary user ──────────────────────────────────────────────
 
 def scraper_node(state: AgentState) -> dict:
-    """Fetch primary user's CF + LC data into state['cf_data'] / state['lc_data']."""
+    """
+    Fetch primary user's CF + LC data into state['cf_data'] / state['lc_data'],
+    plus their computed stats into state['cf_stats'] / state['lc_stats'].
+
+    Delegates to the reusable "profile subgraph" (graph/subgraphs.py) rather
+    than duplicating scrape+stats logic — the same compiled subgraph is also
+    used by peer_scraper_node below for the "compare" flow.
+    """
     cf_username = (state.get("cf_username") or "").strip()
     lc_username = (state.get("lc_username") or "").strip()
     errors      = list(state.get("errors") or [])
@@ -120,27 +127,39 @@ def scraper_node(state: AgentState) -> dict:
     existing_cf = state.get("cf_data")
     existing_lc = state.get("lc_data")
 
-    cf_cached = bool(existing_cf and existing_cf.get("handle"))
-    lc_cached = bool(existing_lc and existing_lc.get("username"))
+    # Deferred import: graph.subgraphs imports FROM this module at its own
+    # module-load time (for _do_scrape/_empty_cf/_empty_lc), so importing it
+    # back at the top of this file would create a circular import. Importing
+    # it here instead — inside the function body — is safe because by the
+    # time scraper_node() actually runs, both modules are already fully
+    # loaded.
+    from graph.subgraphs import run_profile_pipeline
 
-    if cf_cached and lc_cached:
-        print("[Scraper] Both CF+LC cached — skipping re-fetch.")
-        return {"cf_data": existing_cf, "lc_data": existing_lc, "errors": errors}
-
-    print(f"[Scraper] Fetching user — CF='{cf_username}', LC='{lc_username}'")
-    cf_result, lc_result, new_errors = _do_scrape(
-        cf_username, lc_username, existing_cf, existing_lc, "Scraper"
+    result = run_profile_pipeline(
+        cf_username, lc_username, existing_cf, existing_lc, label="Scraper"
     )
-    errors.extend(new_errors)
-    return {"cf_data": cf_result, "lc_data": lc_result, "errors": errors}
+    errors.extend(result.get("errors", []))
+
+    return {
+        "cf_data":  result["cf_data"],
+        "lc_data":  result["lc_data"],
+        "cf_stats": result["cf_stats"],
+        "lc_stats": result["lc_stats"],
+        "errors":   errors,
+    }
 
 
 # ── LangGraph node: peer ──────────────────────────────────────────────────────
 
 def peer_scraper_node(state: AgentState) -> dict:
     """
-    Fetch peer's CF + LC data into state['cf_data2'] / state['lc_data2'].
+    Fetch peer's CF + LC data into state['cf_data2'] / state['lc_data2'],
+    plus their computed stats into state['cf_stats2'] / state['lc_stats2'].
     Called only when intent == 'compare'.
+
+    Reuses the exact same compiled profile subgraph as scraper_node — this
+    is the concrete "subgraph reuse across two flows" the architecture
+    review called out.
     """
     cf_username2 = (state.get("cf_username2") or "").strip()
     lc_username2 = (state.get("lc_username2") or "").strip()
@@ -149,23 +168,23 @@ def peer_scraper_node(state: AgentState) -> dict:
     existing_cf2 = state.get("cf_data2")
     existing_lc2 = state.get("lc_data2")
 
-    cf_cached = bool(existing_cf2 and existing_cf2.get("handle"))
-    lc_cached = bool(existing_lc2 and existing_lc2.get("username"))
-
-    if cf_cached and lc_cached:
-        print("[PeerScraper] Both peer CF+LC cached — skipping re-fetch.")
-        return {"cf_data2": existing_cf2, "lc_data2": existing_lc2, "errors": errors}
-
     if not cf_username2 and not lc_username2:
         errors.append("[PeerScraper] No peer handles provided.")
-        return {"cf_data2": _empty_cf(""), "lc_data2": _empty_lc(""), "errors": errors}
 
-    print(f"[PeerScraper] Fetching peer — CF='{cf_username2}', LC='{lc_username2}'")
-    cf_result, lc_result, new_errors = _do_scrape(
-        cf_username2, lc_username2, existing_cf2, existing_lc2, "PeerScraper"
+    from graph.subgraphs import run_profile_pipeline
+
+    result = run_profile_pipeline(
+        cf_username2, lc_username2, existing_cf2, existing_lc2, label="PeerScraper"
     )
-    errors.extend(new_errors)
-    return {"cf_data2": cf_result, "lc_data2": lc_result, "errors": errors}
+    errors.extend(result.get("errors", []))
+
+    return {
+        "cf_data2":  result["cf_data"],
+        "lc_data2":  result["lc_data"],
+        "cf_stats2": result["cf_stats"],
+        "lc_stats2": result["lc_stats"],
+        "errors":    errors,
+    }
 
 
 # ── empty fallback structures ─────────────────────────────────────────────────

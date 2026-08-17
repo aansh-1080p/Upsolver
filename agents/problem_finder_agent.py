@@ -6,16 +6,29 @@ LangGraph node — finds unsolved practice problems across CF, CSES, LC.
 Flow:
   1. Extract weak tag names from state["analysis"]["weak_topics"]
   2. Normalize tags from CF-format → canonical (fixes "dfs and similar" → "graphs")
-  3. Fetch CF problems using original CF-format tags (CF API understands them)
-  4. Fetch CSES problems using canonical tags (CSES list is tagged canonically)
-  5. Fetch LC problems using canonical tags → LC slugs (fixes the slug mismatch)
-  6. Filter out already-solved problems
-  7. Score and rank by relevance to weak topics
-  8. Return top 30 into state["problems"]
+  3. An LLM agent, bound to three tools (search_codeforces / search_cses /
+     search_leetcode), DECIDES which source(s) are worth querying for these
+     weak topics/difficulty and calls them itself — rather than this node
+     unconditionally fetching all three every time. This is the "agentic"
+     version of problem sourcing: the model reasons about tool use instead
+     of following a hardcoded fetch-everything sequence.
+  4. Filter out already-solved problems
+  5. Score and rank by relevance to weak topics
+  6. Return top 30 into state["problems"]
+
+Reliability note: if tool-calling isn't supported by the configured
+model/provider, or the agent declines to call anything, or every tool call
+it makes fails, this falls back to the original deterministic "fetch all
+three sources" behaviour (_fetch_all) — so the feature is strictly
+additive and can never leave the user with fewer results than before.
 """
 
 import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
 
 from graph.state import AgentState
 from tools.search_tools import (
@@ -103,6 +116,153 @@ def _run_async(coro):
         return pool.submit(asyncio.run, coro).result()
 
 
+# ── tool-calling agent for source selection ───────────────────────────────────
+#
+# Each fetch function is wrapped as a LangChain tool. An LLM bound to these
+# tools decides which source(s) to query and with what tags, instead of the
+# node unconditionally calling all three every time. Tools return a JSON
+# string (the standard, simplest ToolMessage-compatible shape) which the
+# orchestration function below parses back into problem-object lists.
+
+@tool
+async def search_codeforces(tags: list[str], difficulty: str = "medium") -> str:
+    """
+    Search Codeforces' problemset for practice problems matching the given
+    tags (Codeforces-native tag names, e.g. "dp", "dfs and similar", "graphs")
+    and difficulty ("easy", "medium", or "hard"). Returns a JSON array of
+    problem objects (title, url, platform, difficulty/rating, tags).
+    """
+    min_r, max_r = _cf_rating_range(difficulty)
+    try:
+        results = await fetch_cf_problems(tags, min_rating=min_r, max_rating=max_r)
+    except Exception as e:
+        print(f"[ProblemFinder/tool] search_codeforces failed: {e}")
+        results = []
+    return json.dumps(results if isinstance(results, list) else [])
+
+
+@tool
+def search_cses(canonical_tags: list[str]) -> str:
+    """
+    Search the curated CSES problem set for practice problems matching the
+    given canonical/generic tags (e.g. "dp", "graphs", "binary search" — NOT
+    Codeforces-specific tag names). Returns a JSON array of problem objects.
+    """
+    try:
+        results = fetch_cses_problems(canonical_tags)
+    except Exception as e:
+        print(f"[ProblemFinder/tool] search_cses failed: {e}")
+        results = []
+    return json.dumps(results if isinstance(results, list) else [])
+
+
+@tool
+async def search_leetcode(canonical_tags: list[str], difficulty: str = "medium") -> str:
+    """
+    Search LeetCode for practice problems matching the given canonical/
+    generic tags (e.g. "dp", "graphs", "binary search") and difficulty
+    ("easy", "medium", or "hard"). Returns a JSON array of problem objects.
+    """
+    try:
+        results = await fetch_lc_problems(canonical_tags, difficulty=difficulty, limit=25)
+    except Exception as e:
+        print(f"[ProblemFinder/tool] search_leetcode failed: {e}")
+        results = []
+    return json.dumps(results if isinstance(results, list) else [])
+
+
+_PROBLEM_TOOLS = [search_codeforces, search_cses, search_leetcode]
+
+
+async def _agent_choose_and_fetch(cf_tags: list[str], canonical_tags: list[str], difficulty: str):
+    """
+    Ask an LLM which problem source(s) to query — and with what tags — then
+    execute exactly the tool calls it requests. Falls back to the original
+    deterministic "query all three sources" behaviour (_fetch_all) if:
+      - tool-calling / bind_tools isn't supported by the configured model,
+      - the model makes no tool calls at all, or
+      - every tool call it did make came back empty.
+    This guarantees the agentic path can never leave the user with an empty
+    results screen just because a single LLM decision (or tool call) failed.
+    """
+    from agents.llm_utils import get_llm
+
+    try:
+        llm = get_llm(temperature=0.0)
+        llm_with_tools = llm.bind_tools(_PROBLEM_TOOLS)
+    except Exception as e:
+        print(f"[ProblemFinder] Tool-binding unavailable ({type(e).__name__}: {e}) — "
+              f"using deterministic fetch-all.")
+        return await _fetch_all(cf_tags, canonical_tags, difficulty)
+
+    system = SystemMessage(content=(
+        "You are a practice-problem sourcing agent for a competitive programmer. "
+        "You have three tools: search_codeforces (call it with Codeforces-native "
+        "tag names), search_cses and search_leetcode (call these with canonical/"
+        "generic tag names). Decide which tool(s) are worth calling given the "
+        "user's weak topics and difficulty, and call each with a non-empty, "
+        "relevant tag list. Prefer calling all three unless a source is clearly "
+        "unhelpful for these specific topics. Respond ONLY with tool calls — no "
+        "prose."
+    ))
+    human = HumanMessage(content=(
+        f"Weak topics (Codeforces-format tags): {cf_tags}\n"
+        f"Weak topics (canonical tags): {canonical_tags}\n"
+        f"Difficulty: {difficulty}\n"
+        "Call the appropriate tool(s) now."
+    ))
+
+    try:
+        ai_msg = await llm_with_tools.ainvoke([system, human])
+    except Exception as e:
+        print(f"[ProblemFinder] Tool-selection call failed ({type(e).__name__}: {e}) — "
+              f"using deterministic fetch-all.")
+        return await _fetch_all(cf_tags, canonical_tags, difficulty)
+
+    tool_calls = getattr(ai_msg, "tool_calls", None) or []
+    if not tool_calls:
+        print("[ProblemFinder] Agent made no tool calls — using deterministic fetch-all.")
+        return await _fetch_all(cf_tags, canonical_tags, difficulty)
+
+    tool_map = {t.name: t for t in _PROBLEM_TOOLS}
+    cf_probs, cses_probs, lc_probs = [], [], []
+
+    for call in tool_calls:
+        name = call.get("name")
+        args = call.get("args", {}) or {}
+        chosen_tool = tool_map.get(name)
+        if chosen_tool is None:
+            print(f"[ProblemFinder] Agent requested unknown tool {name!r} — skipping.")
+            continue
+
+        try:
+            raw = await chosen_tool.ainvoke(args)
+            parsed = json.loads(raw) if isinstance(raw, str) else raw
+            if not isinstance(parsed, list):
+                parsed = []
+        except Exception as e:
+            print(f"[ProblemFinder] Tool call '{name}' failed: {type(e).__name__}: {e}")
+            parsed = []
+
+        if name == "search_codeforces":
+            cf_probs.extend(parsed)
+        elif name == "search_cses":
+            cses_probs.extend(parsed)
+        elif name == "search_leetcode":
+            lc_probs.extend(parsed)
+
+    called_names = {c.get("name") for c in tool_calls}
+    print(f"[ProblemFinder] Agent chose sources: {sorted(called_names)} — "
+          f"CF:{len(cf_probs)} CSES:{len(cses_probs)} LC:{len(lc_probs)}")
+
+    if not (cf_probs or cses_probs or lc_probs):
+        print("[ProblemFinder] Agent-selected fetch returned nothing — "
+              "falling back to deterministic fetch-all as a safety net.")
+        return await _fetch_all(cf_tags, canonical_tags, difficulty)
+
+    return cf_probs, cses_probs, lc_probs
+
+
 def problem_finder_node(state: AgentState) -> dict:
     """LangGraph node — fetch, filter, rank practice problems."""
     analysis   = state.get("analysis") or {}
@@ -127,7 +287,7 @@ def problem_finder_node(state: AgentState) -> dict:
     print(f"[ProblemFinder] Difficulty:     {difficulty}")
 
     cf_probs, cses_probs, lc_probs = _run_async(
-        _fetch_all(cf_tags, canonical_tags, difficulty)
+        _agent_choose_and_fetch(cf_tags, canonical_tags, difficulty)
     )
 
     print(f"[ProblemFinder] Raw counts — CF:{len(cf_probs)} CSES:{len(cses_probs)} LC:{len(lc_probs)}")

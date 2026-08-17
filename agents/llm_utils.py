@@ -167,6 +167,49 @@ def call_llm(messages: list, temperature: float = 0.3) -> str:
     return ""
 
 
+# ── streaming (real token-by-token output, for live UI display) ──────────────
+
+def stream_llm_text(messages: list, temperature: float = 0.3, callbacks=None):
+    """
+    Generator that yields the LLM's response text as it arrives, chunk by
+    chunk, using the model's native streaming interface (llm.stream()).
+
+    `callbacks` is an optional list of LangChain BaseCallbackHandler
+    instances. When provided, it's passed through to the underlying
+    streaming call so each chunk also fires the handler's on_llm_new_token
+    in real time.
+
+    Reliability: if streaming raises for ANY reason (transient network
+    error, etc.), this falls back to the original, battle-tested
+    call_llm() — which has its own retry-with-backoff — and yields its
+    result as a single chunk.
+    """
+    got_any = False
+    try:
+        llm = get_llm(temperature=temperature)
+        stream_config = {"callbacks": callbacks} if callbacks else None
+        for chunk in llm.stream(messages, config=stream_config):
+            piece = getattr(chunk, "content", "") or ""
+            if piece:
+                got_any = True
+                yield piece
+    except Exception as e:
+        if got_any:
+            print(f"[LLM] Streaming interrupted mid-response: {type(e).__name__}: {e}")
+            return
+        print(f"[LLM] Streaming failed before any output ({type(e).__name__}: {e}) — falling back to call_llm().")
+        text = call_llm(messages, temperature=temperature)
+        if text:
+            yield text
+        return
+
+    if not got_any:
+        print("[LLM] Streaming produced no content — falling back to call_llm().")
+        text = call_llm(messages, temperature=temperature)
+        if text:
+            yield text
+
+
 # ── think-tag and noise stripping ────────────────────────────────────────────
 
 def strip_think_tags(text: str) -> str:

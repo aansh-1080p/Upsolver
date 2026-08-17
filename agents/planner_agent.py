@@ -152,6 +152,8 @@ async def _check_url(client: httpx.AsyncClient, url: str) -> bool:
     """Return True if URL responds with a non-404/non-error status."""
     try:
         # Try HEAD first (fast), fall back to GET for servers that block HEAD
+        #head request is sent to check if the URL is reachable and valid. If the server responds with a status code of 405 (Method Not Allowed), it indicates that the server does not support HEAD requests. In that case, a GET request is sent to the same URL to check its validity. The function returns True if the final response has a status code less than 400, indicating that the URL is valid and reachable. If any exceptions occur during the requests, or if the final status code is 400 or higher, the function returns False, indicating that the URL is not valid or reachable.
+        
         r = await client.head(url, headers=_VALIDATE_HEADERS, timeout=_VALIDATE_TIMEOUT,
                               follow_redirects=True)
         if r.status_code == 405:   # Method Not Allowed — try GET
@@ -326,6 +328,48 @@ def _call_llm_for_plan(prompt: str) -> list[dict]:
     return weeks
 
 
+def _call_llm_for_plan_structured(prompt: str) -> list[dict] | None:
+    """
+    Preferred path: ask the LLM for a StudyPlanOutput object directly via
+    LangChain's with_structured_output(), instead of asking for free-text
+    JSON and then regex-extracting + json_repair-ing it.
+
+    Returns None (never raises) if structured output isn't supported by the
+    configured model/provider, or if the model returns zero weeks — the
+    caller (planner_node) then falls back to the original
+    _call_llm_for_plan() regex-based path, so this is a pure reliability
+    improvement layered in front of proven behavior, not a replacement that
+    could regress it.
+    """
+    try:
+        from agents.llm_utils import get_llm
+        from agents.schemas import StudyPlanOutput
+
+        llm = get_llm(temperature=0.3)
+        structured_llm = llm.with_structured_output(StudyPlanOutput)
+        result = structured_llm.invoke(prompt)
+
+        if isinstance(result, StudyPlanOutput):
+            weeks = [w.model_dump() for w in result.weeks]
+        elif isinstance(result, dict):
+            weeks = result.get("weeks", [])
+        else:
+            print(f"[Planner] Structured output returned unexpected type: {type(result)}")
+            return None
+
+        if not weeks:
+            print("[Planner] Structured output returned zero weeks.")
+            return None
+
+        print(f"[Planner] Structured output succeeded — {len(weeks)} weeks, no regex parsing needed.")
+        return weeks
+
+    except Exception as e:
+        print(f"[Planner] Structured output failed ({type(e).__name__}: {e}) — "
+              f"falling back to regex JSON parsing.")
+        return None
+
+
 # ── fallback plan ─────────────────────────────────────────────────────────────
 
 def _fallback_plan(user_prefs: dict, weak_topics: list) -> list[dict]:
@@ -390,7 +434,13 @@ def planner_node(state: AgentState) -> dict:
     print(f"[Planner] Generating {n_weeks}-week plan...")
 
     prompt = _build_plan_prompt(analysis, user_prefs)
-    weeks  = _call_llm_for_plan(prompt)
+
+    # Preferred: structured output (validated Pydantic object, no regex).
+    # Falls back to the original regex + json_repair path automatically.
+    weeks = _call_llm_for_plan_structured(prompt)
+    if weeks is None:
+        print("[Planner] Falling back to legacy regex-based JSON parsing...")
+        weeks = _call_llm_for_plan(prompt)
 
     if not weeks:
         print("[Planner] LLM failed — using fallback plan.")
